@@ -64,6 +64,8 @@ To decide:
 
 ## Progress and failure
 
+Decided: the event log is its own section of the workspace's left pane, under Activity, with a dot while its stream is live. Its pane is a timeline, newest first: who, what, and when to the second, with a link to any exposure an event names, and a pill saying whether the stream is live, reconnecting or complete.
+
 To decide:
 
 - How the agent's steps appear as they arrive, while `planning`, `deploying` and `cancelling`.

@@ -1,6 +1,7 @@
 import type {
   AuthMethod,
   ExposureDetail,
+  ExposureEvent,
   ExposureNotice,
   ExposureService,
   ExposureSummary,
@@ -194,4 +195,22 @@ export const EXPOSURES: ExposureDetail[] = [
 export function toSummary(e: ExposureDetail): ExposureSummary {
   const { id, status, version, app, scan_id, submitted_at, submitted_by, created_at, needs_vip_count, blocked } = e;
   return { id, status, version, app, scan_id, submitted_at, submitted_by, created_at, needs_vip_count, blocked };
+}
+
+/** Each fixture exposure's event log, as the backend would have recorded it. */
+export function eventsFor(exposureId: string): ExposureEvent[] {
+  const e = EXPOSURES.find((x) => x.id === exposureId);
+  if (!e) return [];
+  const at = (iso: string, minutes = 0) => Date.parse(iso) + minutes * 60_000;
+  const out: Omit<ExposureEvent, 'seq' | 'exposure_id'>[] = [
+    { ts: at(e.submitted_at), type: 'exposure_created', actor: e.submitted_by, payload: { scan_id: e.scan_id, supersedes: e.supersedes } }
+  ];
+  for (let version = 2; version <= e.version; version++) {
+    out.push({ ts: at(e.submitted_at, 60 * version), type: 'grouping_saved', actor: 'mlevi', payload: { version } });
+  }
+  if (e.superseded_by) {
+    const by = EXPOSURES.find((x) => x.id === e.superseded_by);
+    out.push({ ts: at(by?.submitted_at ?? e.submitted_at), type: 'exposure_superseded', actor: by?.submitted_by ?? 'jchen', payload: { by: e.superseded_by } });
+  }
+  return out.map((event, i) => ({ ...event, seq: String(i), exposure_id: exposureId }));
 }

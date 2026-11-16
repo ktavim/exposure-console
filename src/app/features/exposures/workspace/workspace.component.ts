@@ -16,16 +16,19 @@ import {
   Radar,
   Server,
   Share2,
+  ScrollText,
   TriangleAlert,
   User
 } from 'lucide-angular';
 import type { ExposureDetail, ExposureNotice, ExposureService } from '@core/models';
+import { type EventTone, describeEvent } from '@lib/events';
 import { formatOrigin } from '@lib/origin';
 import { StatusBadgeComponent } from '@shared/status-badge.component';
+import { injectExposureEvents } from '../data/exposure-events';
 import { useExposureQuery } from '../data/exposures.queries';
 
 /** What the right pane shows: all the groups, one of them, or a section. */
-type View = 'board' | 'blocked' | 'published' | 'excluded' | `group:${string}`;
+type View = 'board' | 'blocked' | 'published' | 'excluded' | 'events' | `group:${string}`;
 
 interface GroupView {
   id: string;
@@ -131,6 +134,16 @@ interface GroupView {
             <lucide-icon [img]="icons.EyeOff" [size]="15" class="text-fg-muted" aria-hidden="true" />
             <span class="flex-1">Excluded</span><span [class]="count(false)">{{ excluded().length }}</span>
           </button>
+
+          <h3 [class]="heading">Activity</h3>
+          <button type="button" [class]="item('events')" [attr.aria-current]="view() === 'events'" (click)="view.set('events')">
+            <lucide-icon [img]="icons.ScrollText" [size]="15" class="text-fg-muted" aria-hidden="true" />
+            <span class="flex-1">Event log</span>
+            @if (stream.state() === 'live') {
+              <span class="size-1.5 rounded-full bg-ok" title="Live" aria-label="live"></span>
+            }
+            <span [class]="count(false)">{{ stream.events().length }}</span>
+          </button>
         </aside>
 
         <section class="overflow-auto px-7 pb-12 pt-6" aria-labelledby="detail-heading">
@@ -183,6 +196,36 @@ interface GroupView {
                   </tbody>
                 </table>
               </div>
+            }
+            @case ('events') {
+              <div class="flex items-center gap-3">
+                <h2 id="detail-heading" [class]="title">Event log</h2>
+                <span [class]="streamPill()">
+                  <span class="size-1.5 rounded-full bg-current" [class.animate-pulse]="stream.state() === 'live'" aria-hidden="true"></span>
+                  {{ streamLabel() }}
+                </span>
+              </div>
+              <p [class]="subtitle">Every admin action with who and when, and every step the agent reports. Newest first.</p>
+              @if (stream.events().length === 0) {
+                <p class="text-fg-subtle">{{ stream.state() === 'connecting' ? 'Loading…' : 'No events yet.' }}</p>
+              } @else {
+                <ol class="ml-2 border-l border-border">
+                  @for (ev of eventsNewestFirst(); track ev.seq) {
+                    <li class="relative mb-5 pl-6 last:mb-0">
+                      <span [class]="eventDot(ev.tone)" aria-hidden="true"></span>
+                      <div class="leading-snug">
+                        <span class="font-medium">{{ ev.actor }}</span>
+                        <span class="text-fg-muted"> · {{ ev.text }}</span>
+                        @if (ev.link; as link) {
+                          <span class="text-fg-muted"> {{ link.prefix }} </span>
+                          <a [routerLink]="['/exposures', link.exposureId]" class="font-mono text-[12.5px] text-accent hover:underline">{{ link.exposureId }}</a>
+                        }
+                      </div>
+                      <time class="mt-0.5 block text-xs tabular-nums text-fg-subtle" [attr.datetime]="ev.iso">{{ ev.when }}</time>
+                    </li>
+                  }
+                </ol>
+              }
             }
             @case ('excluded') {
               <h2 id="detail-heading" [class]="title">Excluded</h2>
@@ -286,6 +329,37 @@ export class WorkspaceComponent {
   protected readonly query = useExposureQuery(this.id);
   protected readonly exposure = computed(() => this.query.data());
   protected readonly view = signal<View>('board');
+  protected readonly stream = injectExposureEvents(this.id);
+
+  protected readonly eventsNewestFirst = computed(() =>
+    [...this.stream.events()].reverse().map((event) => ({
+      ...describeEvent(event),
+      seq: event.seq,
+      actor: event.actor,
+      iso: new Date(event.ts).toISOString(),
+      when: formatDate(event.ts, 'MMM d, y · HH:mm:ss', 'en-US')
+    }))
+  );
+  protected readonly streamLabel = computed(
+    () => ({ connecting: 'Connecting', live: 'Live', reconnecting: 'Reconnecting', ended: 'Complete' })[this.stream.state()]
+  );
+  protected readonly streamPill = computed(
+    () =>
+      'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ' +
+      {
+        connecting: 'border-border text-fg-subtle',
+        live: 'border-ok-line bg-ok-bg text-ok',
+        reconnecting: 'border-warn-line bg-warn-bg text-warn',
+        ended: 'border-border text-fg-muted'
+      }[this.stream.state()]
+  );
+
+  protected eventDot(tone: EventTone): string {
+    return (
+      'absolute -left-[5px] top-1.5 size-2.5 rounded-full ring-4 ring-bg ' +
+      { neutral: 'bg-fg-subtle', accent: 'bg-accent', ok: 'bg-ok', danger: 'bg-danger', muted: 'bg-border' }[tone]
+    );
+  }
 
   protected readonly icons = {
     ArrowLeft,
@@ -300,6 +374,7 @@ export class WorkspaceComponent {
     OctagonAlert,
     Radar,
     Server,
+    ScrollText,
     Share2,
     TriangleAlert,
     User

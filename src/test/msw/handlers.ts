@@ -1,9 +1,17 @@
-import { delay, http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse, sse } from 'msw';
 import { CLOSED_STATUSES, type ExposureStatus } from '@core/models';
-import { EXPOSURES, toSummary } from '../fixtures/exposures';
+import { EXPOSURES, eventsFor, toSummary } from '../fixtures/exposures';
 
 /** The backend's read-only exposure endpoints, over the fixtures. */
 export const handlers = [
+  // The event log. Open exposures' streams stay open, as the backend's do;
+  // nothing new arrives in the mock.
+  sse<{ message: string }>('/api/exposures/:id/events', ({ params, client }) => {
+    for (const event of eventsFor(String(params['id']))) {
+      client.send({ id: event.seq, data: JSON.stringify(event) });
+    }
+  }),
+
   http.get('/api/exposures', async ({ request }) => {
     await delay(150);
     const statuses = new URL(request.url).searchParams.getAll('status') as ExposureStatus[];

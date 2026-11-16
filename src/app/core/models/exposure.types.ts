@@ -121,3 +121,19 @@ export interface ExposureDetail extends ExposureSummary {
   supersedes: string | null;
   superseded_by: string | null;
 }
+
+/** One entry of an exposure's event log: an admin's action or a step the agent reported. */
+export interface ExposureEvent {
+  exposure_id: string;
+  /** The stream's event id, a string of the sequence number. */
+  seq: string;
+  /** Milliseconds since the epoch. */
+  ts: number;
+  type: string;
+  /** The admin's username, or "agent". */
+  actor: string;
+  payload: Record<string, unknown>;
+}
+
+/** The events that close an exposure; its stream ends after one. */
+export const TERMINAL_EVENTS: readonly string[] = ['exposure_superseded', 'exposure_cancelled', 'exposure_deployed'];
