@@ -106,7 +106,7 @@ export type PlanPart = 'summary' | 'app' | 'diff' | 'declaration' | `vip:${numbe
                   <td class="text-fg-subtle"><lucide-icon [img]="icons.ArrowRight" [size]="14" aria-hidden="true" /></td>
                   <td [class]="td" class="font-mono text-[12.5px]">{{ r.url }}</td>
                   <td [class]="td">
-                    <span [class]="r.source === 'new' ? newPill : publishedPill">{{ r.source === 'new' ? 'this plan' : 'registry' }}</span>
+                    <span [class]="r.source === 'published' ? publishedPill : newPill">{{ sourceLabel[r.source] }}</span>
                   </td>
                 </tr>
               }
@@ -206,6 +206,7 @@ export class PlanReviewComponent {
   protected readonly th = 'px-4 py-2.5 font-medium';
   protected readonly tr = 'border-t border-border-soft transition-colors first:border-t-0 hover:bg-surface-2';
   protected readonly td = 'px-4 py-2.5 align-middle';
+  protected readonly sourceLabel = { new: 'this plan', published: 'registry', app: 'the app itself' } as const;
   protected readonly newPill = 'rounded-full border border-ok-line bg-ok-bg px-2 py-0.5 text-xs font-medium text-ok';
   protected readonly publishedPill = 'rounded-full border border-border px-2 py-0.5 text-xs font-medium text-fg-muted';
 }

@@ -194,7 +194,8 @@ export interface Plan {
     certificate: PlanCertificate | null;
   };
   vips: PlanVip[];
-  rewrite: { original: string; url: string; source: 'new' | 'published' }[];
+  /** new: a VIP this plan creates; published: a registry URL; app: the app's own origin, to its public URL. */
+  rewrite: { original: string; url: string; source: 'new' | 'published' | 'app' }[];
   dns_records: { name: string; type: string; target: string }[];
   declaration: Record<string, unknown>;
   diff: DiffLine[];

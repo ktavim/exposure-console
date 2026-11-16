@@ -16,7 +16,7 @@
   "diff": [
     {
       "op": "@",
-      "text": "@@ -0,0 +1,285 @@"
+      "text": "@@ -0,0 +1,290 @@"
     },
     {
       "op": "+",
@@ -365,6 +365,26 @@
     {
       "op": "+",
       "text": "          \"rightValue\": \"https://reports.example.com/\","
+    },
+    {
+      "op": "+",
+      "text": "          \"type\": \"both\""
+    },
+    {
+      "op": "+",
+      "text": "        },"
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"leftValue\": \"https://expenses.corp.internal/\","
+    },
+    {
+      "op": "+",
+      "text": "          \"rightValue\": \"https://expenses.example.com/\","
     },
     {
       "op": "+",
@@ -1230,6 +1250,11 @@
       "url": "https://reports.example.com",
       "source": "new",
       "original": "https://reports.corp.internal"
+    },
+    {
+      "original": "https://expenses.corp.internal",
+      "url": "https://expenses.example.com",
+      "source": "app"
     }
   ],
   "summary": {
@@ -1312,6 +1337,11 @@
                 "type": "both",
                 "leftValue": "https://reports.corp.internal/",
                 "rightValue": "https://reports.example.com/"
+              },
+              {
+                "type": "both",
+                "leftValue": "https://expenses.corp.internal/",
+                "rightValue": "https://expenses.example.com/"
               }
             ],
             "rewriteMode": "uri-translation"

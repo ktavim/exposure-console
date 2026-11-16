@@ -271,7 +271,9 @@ describe('WorkspaceComponent', () => {
       await userEvent.click(within(sidebar()).getByRole('button', { name: `VIP 1 ${e.plan!.vips[0].ip} ${e.plan!.vips[0].services.length}` }));
       expect(within(detail('VIP 1 ' + e.plan!.vips[0].ip)).getByText('https://api-expenses-8443.example.com')).toBeInTheDocument();
       await userEvent.click(within(sidebar()).getByRole('button', { name: /App VIP/ }));
-      expect(within(detail('App VIP · rewrite map')).getAllByText('this plan')).toHaveLength(e.plan!.rewrite.length);
+      const map = detail('App VIP · rewrite map');
+      expect(within(map).getAllByText('this plan')).toHaveLength(e.plan!.rewrite.filter((r) => r.source === 'new').length);
+      expect(within(map).getByText('the app itself')).toBeInTheDocument();
       await userEvent.click(within(sidebar()).getByRole('button', { name: /Dry-run diff/ }));
       expect(within(detail('Dry-run diff')).getByText(`+${e.plan!.diff.filter((l) => l.op === '+').length}`)).toBeInTheDocument();
     });
