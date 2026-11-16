@@ -5,10 +5,8 @@ import {
   ArrowLeft,
   ArrowRight,
   Ban,
-  CircleCheck,
   CircleDashed,
   FileText,
-  LoaderCircle,
   Play,
   RotateCcw,
   Server,
@@ -22,11 +20,13 @@ import {
   OctagonAlert,
   Radar,
   RefreshCw,
+  Rocket,
   ScrollText,
   Share2,
   User
 } from 'lucide-angular';
-import type { ExposureDetail, ExposureNotice, ExposureStatus } from '@core/models';
+import type { AgentPhase, ExposureDetail, ExposureNotice, ExposureStatus } from '@core/models';
+import { phaseProgress, stepBegun } from '@lib/agent-steps';
 import { type EventTone, describeEvent } from '@lib/events';
 import {
   type GroupingDraft,
@@ -45,12 +45,22 @@ import { StatusBadgeComponent } from '@shared/status-badge.component';
 import { UrlFormComponent } from '@shared/url-form.component';
 import { injectExposureEvents } from '../data/exposure-events';
 import { useExposureActionMutation, useExposureQuery, useSaveGroupsMutation, useSetUrlMutation } from '../data/exposures.queries';
+import { AgentProgressComponent } from './agent-progress.component';
 import { ConfirmPanelComponent } from './confirm-panel.component';
+import { DeploymentComponent } from './deployment.component';
 import { GroupingBoardComponent, type MoveRequest } from './grouping-board.component';
 import { type PlanPart, PlanReviewComponent } from './plan-review.component';
 
 /** What the right pane shows: all the groups, one of them, or a section. */
-type View = 'board' | 'blocked' | 'published' | 'excluded' | 'events' | `group:${string}` | `plan:${PlanPart}`;
+type View =
+  | 'board'
+  | 'blocked'
+  | 'published'
+  | 'excluded'
+  | 'events'
+  | 'deployment'
+  | `group:${string}`
+  | `plan:${PlanPart}`;
 
 /** Where a URL is being set: the app's, or one registry entry's (by its id). */
 type UrlTarget = { kind: 'app'; targetId: string } | { kind: 'registry'; targetId: string };
@@ -73,7 +83,9 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
     GroupingBoardComponent,
     UrlFormComponent,
     PlanReviewComponent,
-    ConfirmPanelComponent
+    ConfirmPanelComponent,
+    AgentProgressComponent,
+    DeploymentComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex flex-col h-full' },
@@ -127,7 +139,7 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
               }
               @case ('failed') {
                 <button type="button" [class]="primaryButton" [disabled]="act.isPending()" (click)="run('retry')">
-                  <lucide-icon [img]="icons.RotateCcw" [size]="14" aria-hidden="true" />Retry {{ e.failed?.phase }}
+                  <lucide-icon [img]="icons.RotateCcw" [size]="14" aria-hidden="true" />{{ retryLabel() }}
                 </button>
               }
             }
@@ -199,6 +211,14 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
             <span class="flex-1">Excluded</span><span [class]="count(false)">{{ excluded().length }}</span>
           </button>
 
+          @if (e.deployment) {
+            <h3 [class]="heading">Live</h3>
+            <button type="button" [class]="item('deployment')" [attr.aria-current]="view() === 'deployment'" (click)="view.set('deployment')">
+              <lucide-icon [img]="icons.Rocket" [size]="15" class="text-ok" aria-hidden="true" />
+              <span class="flex-1">Deployment</span>
+            </button>
+          }
+
           @if (e.plan; as plan) {
             <h3 [class]="heading">Plan · v{{ e.plan_version }}</h3>
             <button type="button" [class]="item('plan:summary')" [attr.aria-current]="view() === 'plan:summary'" (click)="view.set('plan:summary')">
@@ -246,36 +266,24 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
                 <div class="flex-1">
                   <p class="font-medium">{{ phaseLabel(failed.phase) }} failed{{ failed.step ? ' at ' + failed.step : '' }}.</p>
                   <p class="mt-0.5 text-[13px]">{{ failed.message }}</p>
-                  <p class="mt-1 text-[13px] text-fg-muted">Retry resumes from that step; cancel releases what the exposure holds.</p>
+                  <p class="mt-1 text-[13px] text-fg-muted">{{ failedHint(failed.phase) }}</p>
                 </div>
               </div>
             }
-            @if (agentWorking()) {
-              <div class="mb-5 rounded-xl border border-accent-line bg-accent-bg px-4 py-3" role="status" aria-label="Agent progress">
-                <p class="flex items-center gap-2 font-medium">
-                  <lucide-icon [img]="icons.LoaderCircle" [size]="15" class="animate-spin text-accent" aria-hidden="true" />
-                  {{ phaseLabel(e.status) }}: the agent is at work.
-                </p>
-                @if (progress().length) {
-                  <ol class="mt-2 space-y-1 text-[13px]">
-                    @for (p of progress(); track p.step) {
-                      <li class="flex items-center gap-2">
-                        @if (p.state === 'done') {
-                          <lucide-icon [img]="icons.CircleCheck" [size]="14" class="text-ok" aria-hidden="true" />
-                        } @else if (p.state === 'failed') {
-                          <lucide-icon [img]="icons.OctagonAlert" [size]="14" class="text-danger" aria-hidden="true" />
-                        } @else {
-                          <lucide-icon [img]="icons.LoaderCircle" [size]="14" class="animate-spin text-accent" aria-hidden="true" />
-                        }
-                        <span class="font-mono text-xs">{{ p.step }}</span>
-                        <span class="text-fg-muted">{{ p.message }}</span>
-                      </li>
-                    }
-                  </ol>
-                } @else {
-                  <p class="mt-1 text-[13px] text-fg-muted">Waiting for the agent to pick it up.</p>
+            @if (progressPhase(); as phase) {
+              <app-agent-progress
+                class="mb-5 block"
+                [steps]="progress()"
+                [working]="agentWorking()"
+                [heading]="progressHeading()"
+                [label]="agentWorking() ? 'Agent progress' : 'Where it stopped'"
+              >
+                @if (e.status === 'deploying') {
+                  <p class="mt-3 border-t border-accent-line pt-2 text-xs text-fg-muted">
+                    Confirmed by {{ e.confirmed_by }}{{ e.confirmed_at ? ' on ' + formatWhen(e.confirmed_at) : '' }}. A deploy in progress cannot be stopped.
+                  </p>
                 }
-              </div>
+              </app-agent-progress>
             }
             @if (actError()) {
               <p class="mb-5 rounded-xl border border-danger-line bg-danger-bg px-4 py-3 text-[13px] text-danger" role="alert">{{ actError() }}</p>
@@ -286,6 +294,9 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
               }
             } @else {
             @switch (view()) {
+              @case ('deployment') {
+                <app-deployment [exposure]="e" />
+              }
               @case ('blocked') {
                 <h2 id="detail-heading" [class]="title">What blocks planning</h2>
                 <p [class]="subtitle">Each of these keeps a plan from being requested, as the exposure is saved. They are fixed here, or on a new scan.</p>
@@ -495,11 +506,14 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
             >
               <h2 id="cancel-title" class="text-lg font-semibold tracking-tight">Cancel this exposure?</h2>
               <p class="mt-2 text-[13px] text-fg-muted">It closes for good; a new submission of the app starts a new one.</p>
-              @if (e.plan; as plan) {
-                <p class="mt-3 text-[13px] font-medium">The agent releases what it holds:</p>
+              @if (cancelReleases().length) {
+                <p class="mt-3 text-[13px] font-medium">
+                  {{ e.failed?.phase === 'deploying' ? 'The agent undoes the deploy, in reverse:' : 'The agent releases what it holds:' }}
+                </p>
                 <ul class="mt-1 list-disc space-y-0.5 pl-5 text-[13px]">
-                  <li>IP reservations: <span class="font-mono text-xs">{{ heldIps().join(', ') }}</span></li>
-                  <li>{{ plan.summary.certificates }} certificates installed on the F5</li>
+                  @for (r of cancelReleases(); track r) {
+                    <li>{{ r }}</li>
+                  }
                 </ul>
               } @else if (e.status === 'grouping' && e.version === 1 && !stream.events().length) {
                 <p class="mt-3 text-[13px]">Nothing has been reserved for it.</p>
@@ -580,16 +594,54 @@ export class WorkspaceComponent {
     const status = this.exposure()?.status;
     return status === 'planning' || status === 'cancelling' || status === 'deploying';
   });
-  /** The agent's steps for the current version: each step's latest report. */
+  /** The phase whose steps the progress card lists: the one under way, or the one that failed. */
+  protected readonly progressPhase = computed<AgentPhase | null>(() => {
+    const e = this.exposure();
+    if (!e) return null;
+    if (this.agentWorking()) return e.status as AgentPhase;
+    return e.failed?.phase ?? null;
+  });
+  /** Every step of that phase, with its latest report for the current version. */
   protected readonly progress = computed(() => {
-    const version = this.exposure()?.version;
-    const latest = new Map<string, { step: string; state: string; message: string }>();
-    for (const ev of this.stream.events()) {
-      if (ev.type !== 'agent_step' || ev.payload['version'] !== version) continue;
-      const step = String(ev.payload['step']);
-      latest.set(step, { step, state: String(ev.payload['state']), message: String(ev.payload['message'] ?? '') });
+    const phase = this.progressPhase();
+    const e = this.exposure();
+    return phase && e ? phaseProgress(phase, this.stream.events(), e.version) : [];
+  });
+  protected readonly progressHeading = computed(() => {
+    const phase = this.progressPhase();
+    if (!phase) return '';
+    if (!this.agentWorking()) return `Where ${phase} stopped`;
+    const started = this.progress().some((p) => p.state !== 'pending');
+    return `${this.phaseLabel(phase)}: ${started ? 'the agent is at work.' : 'waiting for the agent to pick it up.'}`;
+  });
+  protected readonly retryLabel = computed(() => {
+    const failed = this.exposure()?.failed;
+    if (!failed) return 'Retry';
+    return failed.phase === 'deploying' && failed.step ? `Retry from ${failed.step}` : `Retry ${failed.phase}`;
+  });
+  /**
+   * What cancelling does, in the order the agent does it. After a failed
+   * deploy, the steps it began are undone first, from the event log.
+   */
+  protected readonly cancelReleases = computed(() => {
+    const e = this.exposure();
+    const plan = e?.plan;
+    if (!e || !plan) return [];
+    const out: string[] = [];
+    if (e.failed?.phase === 'deploying') {
+      const events = this.stream.events();
+      if (stepBegun(events, e.version, 'dns')) out.push('The DNS records it created are deleted');
+      if (stepBegun(events, e.version, 'deploy')) {
+        out.push(
+          plan.app.existing
+            ? `Partition ${plan.partition} goes back to its declaration from before the deploy`
+            : `Partition ${plan.partition} is removed from the F5`
+        );
+      }
     }
-    return [...latest.values()];
+    out.push(`${plan.summary.certificates} certificates are removed from the F5`);
+    out.push(`IP reservations are released: ${this.heldIps().join(', ')}`);
+    return out;
   });
   protected readonly warningCount = computed(
     () => (this.exposure()?.services.reduce((n, s) => n + s.warnings.length, 0) ?? 0) + 1
@@ -605,6 +657,18 @@ export class WorkspaceComponent {
 
   protected phaseLabel(phase: string): string {
     return ({ planning: 'Planning', deploying: 'Deploying', cancelling: 'Cancelling' } as Record<string, string>)[phase] ?? phase;
+  }
+
+  protected failedHint(phase: AgentPhase): string {
+    return {
+      planning: 'Retry plans again, reusing what the exposure holds; cancel releases it.',
+      deploying: 'Retry resumes from that step, without repeating the ones before it; cancel undoes those, in reverse.',
+      cancelling: 'Retry cancels again; each step is safe to repeat.'
+    }[phase];
+  }
+
+  protected formatWhen(iso: string): string {
+    return formatDate(iso, 'MMM d, y · HH:mm', 'en-US');
   }
 
   protected run(action: 'plan' | 'confirm' | 'retry' | 'cancel'): void {
@@ -673,8 +737,12 @@ export class WorkspaceComponent {
       if (!e) return;
       const base = untracked(this.baseline);
       if (!base || base.id !== e.id) {
-        // A newly opened exposure: start on its plan when it has one.
-        if (e.plan && e.status === 'awaiting_confirmation') this.view.set('plan:summary');
+        // A newly opened exposure: start on what matters most in its status.
+        if (e.deployment) this.view.set('deployment');
+        else if (e.plan && e.status === 'awaiting_confirmation') this.view.set('plan:summary');
+      } else if (base.status !== 'deployed' && e.status === 'deployed') {
+        // The deploy the admin is watching finished.
+        this.view.set('deployment');
       }
       if (!base || base.id !== e.id || !untracked(this.dirty)) this.reset(e);
     });
@@ -860,6 +928,7 @@ export class WorkspaceComponent {
       { label: 'Submitted by', icon: User, text: e.submitted_by },
       { label: 'Submitted', icon: Clock, text: formatDate(e.submitted_at, 'MMM d, y · HH:mm', 'en-US') }
     ];
+    if (e.deployment) items.push({ label: 'Public URL', icon: Rocket, text: e.deployment.public_url, mono: true });
     if (e.supersedes) items.push({ label: 'Replaces', icon: GitCompareArrows, prefix: 'replaces', link: e.supersedes });
     if (e.superseded_by) items.push({ label: 'Replaced by', icon: GitCompareArrows, prefix: 'replaced by', link: e.superseded_by });
     return items;
@@ -875,12 +944,10 @@ export class WorkspaceComponent {
     ArrowLeft,
     ArrowRight,
     Ban,
-    CircleCheck,
     CircleDashed,
     FileText,
     GitCompareArrows,
     Globe,
-    LoaderCircle,
     Play,
     RotateCcw,
     Server,
@@ -889,6 +956,7 @@ export class WorkspaceComponent {
     LayoutGrid,
     OctagonAlert,
     RefreshCw,
+    Rocket,
     ScrollText,
     Share2
   };

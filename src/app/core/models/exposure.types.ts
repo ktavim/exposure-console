@@ -60,6 +60,8 @@ export interface PublishedOrigin {
   removed_by: string | null;
   /** The URL of the VIP that publishes the origin; null on an entry added by hand. */
   url: string | null;
+  /** The exposure whose deploy registered the entry; null for one added by hand. */
+  exposure_id: string | null;
 }
 
 /** A reason planning is blocked, or a warning about a service. */
@@ -127,7 +129,28 @@ export interface ExposureDetail extends ExposureSummary {
   confirmed_by: string | null;
   confirmed_at: string | null;
   /** Set while failed: the phase retry resumes, the step and the agent's message. */
-  failed: { phase: 'planning' | 'deploying' | 'cancelling'; step: string | null; message: string | null } | null;
+  failed: { phase: AgentPhase; step: string | null; message: string | null } | null;
+  /** Once deployed: what the agent created on the F5 and in DNS, and what the backend registered. */
+  deployment: Deployment | null;
+  deployed_at: string | null;
+}
+
+/** What the agent works on: each is a status, and the phase of a failure. */
+export type AgentPhase = 'planning' | 'deploying' | 'cancelling';
+
+/** A deployed exposure's references (exposure-agent, agent/deployer.py; core/exposure_lifecycle.py). */
+export interface Deployment {
+  partition: string;
+  /** Where outside browsers reach the app. */
+  public_url: string;
+  /** The virtual servers this exposure deployed, as paths on the F5. */
+  virtual_servers: string[];
+  /** The records the agent created, each with the DNS service's id. */
+  dns_records: { name: string; type: string; target: string; id: string | null }[];
+  /** The origins added to the published-origins registry, with the URL that replaces each. */
+  registered: { origin: string; url: string }[];
+  /** Origins someone else registered between the plan and the deploy; their entries stand. */
+  already_registered: { origin: string; url: string | null }[];
 }
 
 export interface PlanCertificate {

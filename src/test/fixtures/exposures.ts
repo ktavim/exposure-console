@@ -1,6 +1,8 @@
 import planJson from './plan.json';
 import type {
+  AgentPhase,
   AuthMethod,
+  Deployment,
   Plan,
   ExposureDetail,
   ExposureEvent,
@@ -31,7 +33,8 @@ function entry(host: string, url: string | null): PublishedOrigin {
     added_at: '2026-10-02T09:00:00+00:00',
     removed_at: null,
     removed_by: null,
-    url
+    url,
+    exposure_id: null
   };
 }
 
@@ -110,7 +113,7 @@ function blockers(app_url: string | null, services: ExposureService[]): Exposure
 }
 
 type Derived = 'groups' | 'services' | 'blocked_by' | 'needs_vip_count' | 'blocked';
-type PlanFields = 'plan' | 'plan_hash' | 'plan_version' | 'confirmed_by' | 'confirmed_at' | 'failed';
+type PlanFields = 'plan' | 'plan_hash' | 'plan_version' | 'confirmed_by' | 'confirmed_at' | 'failed' | 'deployment' | 'deployed_at';
 
 function exposure(
   base: Omit<ExposureDetail, Derived | PlanFields> & Partial<Pick<ExposureDetail, PlanFields>>,
@@ -129,6 +132,8 @@ function exposure(
     confirmed_by: null,
     confirmed_at: null,
     failed: null,
+    deployment: null,
+    deployed_at: null,
     ...base,
     groups: groupIds.map((g) => ({ id: g, service_ids: services.filter((s) => s.group_id === g).map((s) => s.id) })),
     services,
@@ -140,6 +145,59 @@ function exposure(
 
 /** The plan the agent made for a real exposure (exposure-agent, fake adapters), renamed to Expenses. */
 export const PLAN = planJson as Plan;
+
+/** The same plan for another app: its names replaced, its addresses moved along the range. */
+function planFor(app: string, reports: string, ipDigit: number): Plan {
+  return JSON.parse(
+    JSON.stringify(PLAN)
+      .replaceAll('expenses', app.toLowerCase())
+      .replaceAll('Expenses', app)
+      .replaceAll('reports', reports)
+      .replaceAll('"203.0.113.', `"203.0.113.${ipDigit}`)
+  ) as Plan;
+}
+
+/** What a deploy of `plan` leaves behind, as the agent and the backend report it. */
+export function deploymentFrom(plan: Plan): Deployment {
+  return {
+    partition: plan.partition,
+    public_url: plan.app.public_url,
+    virtual_servers: [...plan.vips.map((v) => `/${plan.partition}/app/vs_${v.group_id}`), `/${plan.partition}/app/vs_app`],
+    dns_records: plan.dns_records.map((r, i) => ({ ...r, id: `rec_${(i + 1).toString().padStart(4, '0')}` })),
+    registered: plan.vips.flatMap((v) => v.services.map((s) => ({ origin: s.original, url: s.url }))),
+    already_registered: []
+  };
+}
+
+/** What the agent reports for each step of a phase, done, for `plan`. */
+export function mockSteps(phase: AgentPhase, plan: Plan): { step: string; message: string }[] {
+  const ips = [...plan.vips.map((v) => `${v.group_id} ${v.ip}`), `app ${plan.app.ip}`];
+  const diff = `+${plan.summary.add} ~${plan.summary.change} -${plan.summary.destroy}`;
+  return {
+    planning: [
+      { step: 'names', message: `${plan.dns_records.length} names in example.com` },
+      { step: 'reserve_ips', message: ips.join(', ') },
+      { step: 'certificates', message: `${plan.summary.certificates} issued, 0 reused` },
+      { step: 'render', message: `${plan.vips.length} VIPs and the app's` },
+      { step: 'dry_run', message: diff }
+    ],
+    deploying: [
+      { step: 'recheck', message: `as planned: ${diff}` },
+      { step: 'deploy', message: `posted to ${plan.partition}` },
+      { step: 'verify', message: `${plan.vips.length + 1} virtual servers up; the app's responses are rewritten` },
+      { step: 'dns', message: `${plan.dns_records.length} records in example.com` }
+    ],
+    cancelling: [
+      { step: 'remove_dns', message: 'none created' },
+      { step: 'restore_declaration', message: 'nothing deployed' },
+      { step: 'remove_certificates', message: `${plan.summary.certificates} removed` },
+      { step: 'release_ips', message: ips.map((x) => x.split(' ')[1]).join(', ') }
+    ]
+  }[phase];
+}
+
+const TRAVEL_PLAN = planFor('Travel', 'bookings', 1);
+const INVENTORY_PLAN = planFor('Inventory', 'stock', 2);
 
 const payrollOld = id('exp');
 const payroll = id('exp');
@@ -226,6 +284,63 @@ export const EXPOSURES: ExposureDetail[] = [
       { host: 'api.expenses.corp.internal', port: 8443, group: 0 },
       { host: 'reports.corp.internal', group: 1, found_by: ['interceptor'] }
     ]
+  ),
+  exposure(
+    {
+      id: id('exp'),
+      status: 'deployed',
+      version: 1,
+      app: { id: 'app_travel', name: 'Travel', url: 'https://travel.corp.internal' },
+      scan_id: 'e5f6a7b8c9d04e1f2a3b4c5d6e7f8091',
+      submitted_at: '2026-11-06T10:30:00+00:00',
+      submitted_by: 'rkatz',
+      created_at: '2026-11-06T10:30:00+00:00',
+      supersedes: null,
+      superseded_by: null,
+      plan: TRAVEL_PLAN,
+      plan_hash: 'sha256:7c1e0b9d2f4a6c8e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d1f3a5c7e',
+      plan_version: 1,
+      confirmed_by: 'mlevi',
+      confirmed_at: '2026-11-06T14:02:00+00:00',
+      deployment: deploymentFrom(TRAVEL_PLAN),
+      deployed_at: '2026-11-06T14:04:00+00:00'
+    },
+    2,
+    [
+      { host: 'api.travel.corp.internal', group: 0 },
+      { host: 'api.travel.corp.internal', port: 8443, group: 0 },
+      { host: 'bookings.corp.internal', group: 1 }
+    ]
+  ),
+  exposure(
+    {
+      id: id('exp'),
+      status: 'failed',
+      version: 1,
+      app: { id: 'app_inventory', name: 'Inventory', url: 'https://inventory.corp.internal' },
+      scan_id: 'f6a7b8c9d0e14f2a3b4c5d6e7f8091a2',
+      submitted_at: '2026-11-13T11:15:00+00:00',
+      submitted_by: 'jchen',
+      created_at: '2026-11-13T11:15:00+00:00',
+      supersedes: null,
+      superseded_by: null,
+      plan: INVENTORY_PLAN,
+      plan_hash: 'sha256:3b5d7f9a1c2e4b6d8f0a2c4e6b8d0f1a3c5e7b9d2f4a6c8e0b1d3f5a7c9e2b4d',
+      plan_version: 1,
+      confirmed_by: 'jchen',
+      confirmed_at: '2026-11-16T09:40:00+00:00',
+      failed: {
+        phase: 'deploying',
+        step: 'verify',
+        message: "the app's responses still name https://stock.corp.internal: the F5 is not rewriting them"
+      }
+    },
+    2,
+    [
+      { host: 'api.inventory.corp.internal', group: 0 },
+      { host: 'api.inventory.corp.internal', port: 8443, group: 0 },
+      { host: 'stock.corp.internal', group: 1 }
+    ]
   )
 ];
 
@@ -251,6 +366,36 @@ export function eventsFor(exposureId: string): ExposureEvent[] {
   ];
   for (let version = 2; version <= e.version; version++) {
     out.push({ ts: at(e.submitted_at, 60 * version), type: 'grouping_saved', actor: 'mlevi', payload: { version } });
+  }
+  if (e.plan) {
+    const version = e.plan_version ?? e.version;
+    const t = at(e.submitted_at, 90);
+    out.push({ ts: t, type: 'plan_requested', actor: e.submitted_by, payload: { version } });
+    mockSteps('planning', e.plan).forEach(({ step, message }, i) => {
+      out.push({ ts: t + 1000 * (2 * i + 1), type: 'agent_step', actor: 'agent', payload: { version, step, state: 'started', message: null } });
+      out.push({ ts: t + 1000 * (2 * i + 2), type: 'agent_step', actor: 'agent', payload: { version, step, state: 'done', message } });
+    });
+    out.push({ ts: t + 15_000, type: 'plan_ready', actor: 'agent', payload: { version, plan_hash: e.plan_hash, summary: e.plan.summary } });
+  }
+  if (e.plan && e.confirmed_by && e.confirmed_at) {
+    const version = e.plan_version ?? e.version;
+    const t = Date.parse(e.confirmed_at);
+    out.push({ ts: t, type: 'plan_confirmed', actor: e.confirmed_by, payload: { version, plan_hash: e.plan_hash } });
+    const failedAt = e.failed?.phase === 'deploying' ? e.failed.step : null;
+    for (const [i, { step, message }] of mockSteps('deploying', e.plan).entries()) {
+      out.push({ ts: t + 1000 * (2 * i + 1), type: 'agent_step', actor: 'agent', payload: { version, step, state: 'started', message: null } });
+      if (step === failedAt) {
+        out.push({ ts: t + 1000 * (2 * i + 2), type: 'agent_step', actor: 'agent', payload: { version, step, state: 'failed', message: e.failed?.message } });
+        out.push({ ts: t + 1000 * (2 * i + 2), type: 'deploying_failed', actor: 'agent', payload: { step, message: e.failed?.message } });
+        break;
+      }
+      out.push({ ts: t + 1000 * (2 * i + 2), type: 'agent_step', actor: 'agent', payload: { version, step, state: 'done', message } });
+    }
+    if (e.deployment) {
+      const { registered, already_registered } = e.deployment;
+      out.push({ ts: t + 12_000, type: 'origins_registered', actor: 'agent', payload: { registered, already_registered } });
+      out.push({ ts: t + 12_000, type: 'exposure_deployed', actor: 'agent', payload: { public_url: e.deployment.public_url } });
+    }
   }
   if (e.superseded_by) {
     const by = EXPOSURES.find((x) => x.id === e.superseded_by);

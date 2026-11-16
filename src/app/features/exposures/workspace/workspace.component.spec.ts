@@ -334,12 +334,94 @@ describe('WorkspaceComponent', () => {
       step(2, 1, 'reserve_ips', 'done', 'grp_1 203.0.113.1');
       step(3, 1, 'certificates', 'started');
       const progress = await screen.findByRole('status', { name: 'Agent progress' });
+      // Every step of the phase from the start, the old version's report left out.
       await waitFor(() =>
-        expect(within(progress).getAllByRole('listitem').map((li) => li.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
-          expect.stringMatching(/^reserve_ips\s*grp_1 203\.0\.113\.1$/),
-          'certificates'
+        expect(within(progress).getAllByRole('listitem').map((li) => li.getAttribute('aria-label'))).toEqual([
+          'Form the public names: to do',
+          'Reserve IP addresses: done',
+          'Issue and install certificates: under way',
+          'Render the declaration: to do',
+          'Dry-run it on the F5: to do'
         ])
       );
+      expect(within(progress).getByText(/grp_1 203\.0\.113\.1/)).toBeInTheDocument();
+      expect(progress).toHaveTextContent('Planning: the agent is at work.');
+    });
+  });
+
+  describe('deploying', () => {
+    const fresh = (i: number) => structuredClone(EXPOSURES[i]);
+    const replay = (source: () => { emit(event: ExposureEvent): void }, id: string) => {
+      for (const event of eventsFor(id)) source().emit(event);
+    };
+
+    it('says who confirmed a deploy, and lists its steps as the agent reports them', async () => {
+      const e: ExposureDetail = { ...fresh(3), status: 'deploying', confirmed_by: 'mlevi', confirmed_at: '2026-11-16T10:00:00+00:00' };
+      const { source } = await renderWorkspace(e);
+      const progress = screen.getByRole('status', { name: 'Agent progress' });
+      expect(progress).toHaveTextContent('Deploying: waiting for the agent to pick it up.');
+      expect(progress).toHaveTextContent('Confirmed by mlevi');
+      expect(progress).toHaveTextContent('A deploy in progress cannot be stopped.');
+      source().emit({ exposure_id: e.id, seq: '90', ts: 0, type: 'agent_step', actor: 'agent', payload: { version: 2, step: 'recheck', state: 'skipped', message: 'done in an earlier attempt' } });
+      source().emit({ exposure_id: e.id, seq: '91', ts: 0, type: 'agent_step', actor: 'agent', payload: { version: 2, step: 'deploy', state: 'started', message: null } });
+      await waitFor(() => expect(progress).toHaveTextContent('Deploying: the agent is at work.'));
+      expect(within(progress).getAllByRole('listitem').map((li) => li.getAttribute('aria-label'))).toEqual([
+        'Recheck the plan against the F5: done earlier',
+        'Post the declaration: under way',
+        'Verify the VIPs and the rewriting: to do',
+        'Create the DNS records: to do'
+      ]);
+    });
+
+    it('opens a deployed exposure on where it is live and what it left behind', async () => {
+      const e = fresh(4);
+      await renderWorkspace(e);
+      const pane = detail('Deployed');
+      const d = e.deployment!;
+      expect(within(pane).getByRole('link', { name: d.public_url })).toHaveAttribute('href', d.public_url);
+      expect(pane).toHaveTextContent(`Confirmed by ${e.confirmed_by}`);
+      for (const r of d.dns_records) expect(within(pane).getByText(r.name)).toBeInTheDocument();
+      for (const vs of d.virtual_servers) expect(within(pane).getByText(vs)).toBeInTheDocument();
+      expect(within(pane).getByText(d.registered[0].url)).toBeInTheDocument();
+      expect(within(sidebar()).getByRole('button', { name: 'Deployment' })).toHaveAttribute('aria-current', 'true');
+      // Nothing to do on a deployed exposure.
+      expect(screen.queryByRole('button', { name: /Cancel exposure|Retry|Request plan/ })).toBeNull();
+    });
+
+    it('moves to the deployment when the deploy it shows finishes', async () => {
+      let current: ExposureDetail = { ...fresh(3), status: 'deploying', confirmed_by: 'mlevi', confirmed_at: '2026-11-16T10:00:00+00:00' };
+      const { client } = await renderWorkspace(current, { get: async () => structuredClone(current) });
+      expect(screen.queryByRole('region', { name: 'Deployed' })).toBeNull();
+      current = { ...current, status: 'deployed', deployment: fresh(4).deployment, deployed_at: '2026-11-16T10:03:00+00:00' };
+      await client.invalidateQueries({ queryKey: exposureKeys.detail(current.id) });
+      expect(await screen.findByRole('region', { name: 'Deployed' })).toBeInTheDocument();
+    });
+
+    it('shows where a deploy stopped, retries from that step, and says what cancelling undoes', async () => {
+      const e = fresh(5);
+      const { api, source } = await renderWorkspace(e);
+      replay(source, e.id);
+      expect(screen.getByRole('alert')).toHaveTextContent('Deploying failed at verify.');
+      const stopped = await screen.findByRole('group', { name: 'Where it stopped' });
+      await waitFor(() =>
+        expect(within(stopped).getAllByRole('listitem').map((li) => li.getAttribute('aria-label'))).toEqual([
+          'Recheck the plan against the F5: done',
+          'Post the declaration: done',
+          'Verify the VIPs and the rewriting: failed',
+          'Create the DNS records: to do'
+        ])
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: /Cancel exposure/ }));
+      const dialog = screen.getByRole('alertdialog', { name: 'Cancel this exposure?' });
+      expect(dialog).toHaveTextContent('The agent undoes the deploy, in reverse:');
+      expect(dialog).toHaveTextContent(`Partition ${e.plan!.partition} is removed from the F5`);
+      // The DNS step never began, so there are no records to delete.
+      expect(dialog).not.toHaveTextContent('DNS records');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Keep it' }));
+
+      await userEvent.click(screen.getByRole('button', { name: 'Retry from verify' }));
+      expect(api.act).toHaveBeenCalledWith(e.id, 'retry', { version: 1, plan_hash: undefined });
     });
   });
 });

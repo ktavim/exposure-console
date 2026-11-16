@@ -76,10 +76,7 @@ Decided while building phase 3:
 
 Decided: the event log is its own section of the workspace's left pane, under Activity, with a dot while its stream is live. Its pane is a timeline, newest first: who, what, and when to the second, with a link to any exposure an event names, and a pill saying whether the stream is live, reconnecting or complete.
 
-To decide:
-
-- How the agent's steps appear as they arrive, while `planning`, `deploying` and `cancelling`.
-- How a failed step, its message and the step log are shown.
+Decided while building phase 5: while `planning`, `deploying` or `cancelling`, a card above the pane lists every step of the phase from the start, each done, under way, failed, skipped (done by an earlier attempt, which a retry resumed after) or still to come, with the agent's message beside it. During a deploy it adds who confirmed it, and that a deploy cannot be stopped. Once a phase failed, a banner names the step and the agent's message, and the same list sits under it, as "Where it stopped".
 
 ## Destructive actions
 
@@ -91,6 +88,13 @@ Confirm deploys to the F5; cancel releases IP reservations, certificates and DNS
 Decided for confirm, from prototype C: a side panel lists what deploying does, step by step, says a deploy cannot be stopped, and has a checkbox for each warning; Deploy is enabled once every one is ticked. The header's button counts the warnings to acknowledge.
 
 Decided for cancel: a small dialog lists what the agent will release, the IPs and certificates from the plan, before a red Cancel exposure.
+
+Decided while building phase 5:
+
+- Retry after a failed deploy is labelled with the step it resumes from, as "Retry from verify".
+- Cancelling after a failed deploy lists what the agent undoes, in its order: the DNS records it created and the partition's previous declaration, when those steps began, then the certificates and the IPs.
+- A deployed exposure gains a Live section in the left pane, Deployment, and opens on it: where the app is live, who confirmed it and when, the virtual servers, the DNS records and the origins registered. A workspace watching a deploy moves to it when the deploy finishes.
+- The header shows a deployed exposure's public URL beside the app's own.
 
 ## Density, dark mode, accessibility
 

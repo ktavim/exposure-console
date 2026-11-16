@@ -68,8 +68,33 @@ export function describeEvent(event: ExposureEvent): EventPresentation {
         tone: p['state'] === 'failed' ? 'danger' : p['state'] === 'done' ? 'ok' : 'neutral'
       };
     }
-    case 'exposure_deployed':
-      return { text: 'Deployed', tone: 'ok' };
+    case 'origins_registered': {
+      const registered = Array.isArray(p['registered']) ? p['registered'].length : 0;
+      const already = Array.isArray(p['already_registered']) ? p['already_registered'].length : 0;
+      const text = `Registered ${registered} origin${registered === 1 ? '' : 's'} as published`;
+      return { text: already ? `${text}; ${already} already were, by someone else` : text, tone: 'ok' };
+    }
+    case 'exposure_deployed': {
+      const url = str(p['public_url']);
+      return { text: url ? `Deployed; the app is live at ${url}` : 'Deployed', tone: 'ok' };
+    }
+    case 'grouping_pruned': {
+      const origins = Array.isArray(p['origins']) ? p['origins'].join(', ') : 'Some services';
+      const by = str(p['by']);
+      return {
+        text: `${origins} left the grouping${str(p['from_status']) ? ', and the plan was dropped' : ''}, published by`,
+        tone: 'muted',
+        link: by ? { prefix: '', exposureId: by } : undefined
+      };
+    }
+    case 'earlier_exposure_deployed': {
+      const by = str(p['by']);
+      return {
+        text: 'An earlier submission of this app deployed; planning is unblocked',
+        tone: 'accent',
+        link: by ? { prefix: '', exposureId: by } : undefined
+      };
+    }
     default: {
       const name = event.type.replace(/_/g, ' ');
       return { text: name.charAt(0).toUpperCase() + name.slice(1), tone: 'neutral' };
