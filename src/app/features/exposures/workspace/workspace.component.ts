@@ -4,7 +4,14 @@ import { RouterLink } from '@angular/router';
 import {
   ArrowLeft,
   ArrowRight,
+  Ban,
+  CircleCheck,
   CircleDashed,
+  FileText,
+  LoaderCircle,
+  Play,
+  RotateCcw,
+  Server,
   Clock,
   EyeOff,
   GitCompareArrows,
@@ -37,11 +44,13 @@ import { formatOrigin } from '@lib/origin';
 import { StatusBadgeComponent } from '@shared/status-badge.component';
 import { UrlFormComponent } from '@shared/url-form.component';
 import { injectExposureEvents } from '../data/exposure-events';
-import { useExposureQuery, useSaveGroupsMutation, useSetUrlMutation } from '../data/exposures.queries';
+import { useExposureActionMutation, useExposureQuery, useSaveGroupsMutation, useSetUrlMutation } from '../data/exposures.queries';
+import { ConfirmPanelComponent } from './confirm-panel.component';
 import { GroupingBoardComponent, type MoveRequest } from './grouping-board.component';
+import { type PlanPart, PlanReviewComponent } from './plan-review.component';
 
 /** What the right pane shows: all the groups, one of them, or a section. */
-type View = 'board' | 'blocked' | 'published' | 'excluded' | 'events' | `group:${string}`;
+type View = 'board' | 'blocked' | 'published' | 'excluded' | 'events' | `group:${string}` | `plan:${PlanPart}`;
 
 /** Where a URL is being set: the app's, or one registry entry's (by its id). */
 type UrlTarget = { kind: 'app'; targetId: string } | { kind: 'registry'; targetId: string };
@@ -57,7 +66,15 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
 @Component({
   selector: 'app-workspace',
   standalone: true,
-  imports: [RouterLink, StatusBadgeComponent, LucideAngularModule, GroupingBoardComponent, UrlFormComponent],
+  imports: [
+    RouterLink,
+    StatusBadgeComponent,
+    LucideAngularModule,
+    GroupingBoardComponent,
+    UrlFormComponent,
+    PlanReviewComponent,
+    ConfirmPanelComponent
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex flex-col h-full' },
   template: `
@@ -84,6 +101,37 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
           <h1 class="text-xl font-semibold tracking-tight">{{ e.app.name }}</h1>
           <app-status-badge [status]="e.status" />
           <span class="rounded-md border border-border px-1.5 text-xs font-medium tabular-nums text-fg-muted" title="Version">v{{ e.version }}</span>
+          <div class="ml-auto flex items-center gap-2">
+            @if (cancellable()) {
+              <button type="button" [class]="secondaryButton" class="!text-danger" (click)="cancelOpen.set(true)">
+                <lucide-icon [img]="icons.Ban" [size]="14" aria-hidden="true" />Cancel exposure
+              </button>
+            }
+            @switch (e.status) {
+              @case ('grouping') {
+                <button
+                  type="button"
+                  [class]="primaryButton"
+                  [disabled]="!!planBlocker() || act.isPending()"
+                  [title]="planBlocker() ?? 'Ask the agent to reserve IPs, request certificates and dry-run the declaration'"
+                  (click)="run('plan')"
+                >
+                  <lucide-icon [img]="icons.Play" [size]="14" aria-hidden="true" />Request plan
+                </button>
+              }
+              @case ('awaiting_confirmation') {
+                <button type="button" [class]="primaryButton" [disabled]="dirty()" (click)="confirmOpen.set(true)">
+                  Review and deploy
+                  <span class="rounded-full bg-white/25 px-1.5 text-xs">{{ warningCount() }} to acknowledge</span>
+                </button>
+              }
+              @case ('failed') {
+                <button type="button" [class]="primaryButton" [disabled]="act.isPending()" (click)="run('retry')">
+                  <lucide-icon [img]="icons.RotateCcw" [size]="14" aria-hidden="true" />Retry {{ e.failed?.phase }}
+                </button>
+              }
+            }
+          </div>
         </div>
         <dl class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px] text-fg-muted">
           @for (m of meta(); track m.label) {
@@ -151,6 +199,34 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
             <span class="flex-1">Excluded</span><span [class]="count(false)">{{ excluded().length }}</span>
           </button>
 
+          @if (e.plan; as plan) {
+            <h3 [class]="heading">Plan · v{{ e.plan_version }}</h3>
+            <button type="button" [class]="item('plan:summary')" [attr.aria-current]="view() === 'plan:summary'" (click)="view.set('plan:summary')">
+              <lucide-icon [img]="icons.FileText" [size]="15" class="text-fg-muted" aria-hidden="true" />
+              <span class="flex-1">Summary</span>
+              <span class="text-xs font-medium tabular-nums"><span class="text-ok">+{{ plan.summary.add }}</span> <span class="text-warn">~{{ plan.summary.change }}</span></span>
+            </button>
+            @for (v of plan.vips; track v.group_id; let i = $index) {
+              <button type="button" [class]="item('plan:vip:' + i)" [attr.aria-current]="view() === 'plan:vip:' + i" (click)="view.set(planView('vip:' + i))">
+                <lucide-icon [img]="icons.Server" [size]="15" class="text-fg-muted" aria-hidden="true" />
+                <span class="flex-1">VIP {{ i + 1 }} <span class="font-mono text-xs text-fg-muted">{{ v.ip }}</span></span>
+                <span [class]="count(false)">{{ v.services.length }}</span>
+              </button>
+            }
+            <button type="button" [class]="item('plan:app')" [attr.aria-current]="view() === 'plan:app'" (click)="view.set('plan:app')">
+              <lucide-icon [img]="icons.Globe" [size]="15" class="text-fg-muted" aria-hidden="true" />
+              <span class="flex-1">App VIP · rewrite map</span><span [class]="count(false)">{{ plan.rewrite.length }}</span>
+            </button>
+            <button type="button" [class]="item('plan:diff')" [attr.aria-current]="view() === 'plan:diff'" (click)="view.set('plan:diff')">
+              <lucide-icon [img]="icons.GitCompareArrows" [size]="15" class="text-fg-muted" aria-hidden="true" />
+              <span class="flex-1">Dry-run diff</span>
+            </button>
+            <button type="button" [class]="item('plan:declaration')" [attr.aria-current]="view() === 'plan:declaration'" (click)="view.set('plan:declaration')">
+              <lucide-icon [img]="icons.ScrollText" [size]="15" class="text-fg-muted" aria-hidden="true" />
+              <span class="flex-1">Declaration</span>
+            </button>
+          }
+
           <h3 [class]="heading">Activity</h3>
           <button type="button" [class]="item('events')" [attr.aria-current]="view() === 'events'" (click)="view.set('events')">
             <lucide-icon [img]="icons.ScrollText" [size]="15" class="text-fg-muted" aria-hidden="true" />
@@ -164,6 +240,51 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
 
         <div class="flex min-h-0 flex-col">
           <section class="flex-1 overflow-auto px-7 pb-12 pt-6" aria-labelledby="detail-heading">
+            @if (e.failed; as failed) {
+              <div class="mb-5 flex items-start gap-3 rounded-xl border border-danger-line bg-danger-bg px-4 py-3 text-danger" role="alert">
+                <lucide-icon [img]="icons.OctagonAlert" [size]="16" class="mt-0.5 shrink-0" aria-hidden="true" />
+                <div class="flex-1">
+                  <p class="font-medium">{{ phaseLabel(failed.phase) }} failed{{ failed.step ? ' at ' + failed.step : '' }}.</p>
+                  <p class="mt-0.5 text-[13px]">{{ failed.message }}</p>
+                  <p class="mt-1 text-[13px] text-fg-muted">Retry resumes from that step; cancel releases what the exposure holds.</p>
+                </div>
+              </div>
+            }
+            @if (agentWorking()) {
+              <div class="mb-5 rounded-xl border border-accent-line bg-accent-bg px-4 py-3" role="status" aria-label="Agent progress">
+                <p class="flex items-center gap-2 font-medium">
+                  <lucide-icon [img]="icons.LoaderCircle" [size]="15" class="animate-spin text-accent" aria-hidden="true" />
+                  {{ phaseLabel(e.status) }}: the agent is at work.
+                </p>
+                @if (progress().length) {
+                  <ol class="mt-2 space-y-1 text-[13px]">
+                    @for (p of progress(); track p.step) {
+                      <li class="flex items-center gap-2">
+                        @if (p.state === 'done') {
+                          <lucide-icon [img]="icons.CircleCheck" [size]="14" class="text-ok" aria-hidden="true" />
+                        } @else if (p.state === 'failed') {
+                          <lucide-icon [img]="icons.OctagonAlert" [size]="14" class="text-danger" aria-hidden="true" />
+                        } @else {
+                          <lucide-icon [img]="icons.LoaderCircle" [size]="14" class="animate-spin text-accent" aria-hidden="true" />
+                        }
+                        <span class="font-mono text-xs">{{ p.step }}</span>
+                        <span class="text-fg-muted">{{ p.message }}</span>
+                      </li>
+                    }
+                  </ol>
+                } @else {
+                  <p class="mt-1 text-[13px] text-fg-muted">Waiting for the agent to pick it up.</p>
+                }
+              </div>
+            }
+            @if (actError()) {
+              <p class="mb-5 rounded-xl border border-danger-line bg-danger-bg px-4 py-3 text-[13px] text-danger" role="alert">{{ actError() }}</p>
+            }
+            @if (planPart(); as part) {
+              @if (e.plan; as plan) {
+                <app-plan-review [plan]="plan" [part]="part" />
+              }
+            } @else {
             @switch (view()) {
               @case ('blocked') {
                 <h2 id="detail-heading" [class]="title">What blocks planning</h2>
@@ -351,7 +472,48 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
                 }
               }
             }
+            }
           </section>
+
+          @if (confirmOpen() && e.plan) {
+            <app-confirm-panel
+              [exposure]="e"
+              [pending]="act.isPending()"
+              [error]="actError()"
+              (confirmed)="run('confirm')"
+              (closed)="confirmOpen.set(false); actError.set(null)"
+            />
+          }
+          @if (cancelOpen()) {
+            <div class="fixed inset-0 z-40 bg-black/30" aria-hidden="true" (click)="cancelOpen.set(false)"></div>
+            <div
+              class="fixed left-1/2 top-24 z-50 w-[440px] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-xl border border-border bg-surface p-5 shadow-raised"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="cancel-title"
+              (keydown.escape)="cancelOpen.set(false)"
+            >
+              <h2 id="cancel-title" class="text-lg font-semibold tracking-tight">Cancel this exposure?</h2>
+              <p class="mt-2 text-[13px] text-fg-muted">It closes for good; a new submission of the app starts a new one.</p>
+              @if (e.plan; as plan) {
+                <p class="mt-3 text-[13px] font-medium">The agent releases what it holds:</p>
+                <ul class="mt-1 list-disc space-y-0.5 pl-5 text-[13px]">
+                  <li>IP reservations: <span class="font-mono text-xs">{{ heldIps().join(', ') }}</span></li>
+                  <li>{{ plan.summary.certificates }} certificates installed on the F5</li>
+                </ul>
+              } @else if (e.status === 'grouping' && e.version === 1 && !stream.events().length) {
+                <p class="mt-3 text-[13px]">Nothing has been reserved for it.</p>
+              } @else {
+                <p class="mt-3 text-[13px]">The agent releases whatever it holds for it, from its own record.</p>
+              }
+              <div class="mt-5 flex justify-end gap-2">
+                <button type="button" class="rounded-md px-3 py-1.5 text-[13px] font-medium text-fg-muted hover:bg-border-soft" (click)="cancelOpen.set(false)">Keep it</button>
+                <button type="button" class="rounded-md bg-danger px-3.5 py-1.5 text-[13px] font-medium text-white" [disabled]="act.isPending()" (click)="run('cancel')">
+                  Cancel exposure
+                </button>
+              </div>
+            </div>
+          }
 
           @if (dirty() || saveMessage()) {
             <div class="flex items-center gap-3 border-t border-border bg-surface px-7 py-3 shadow-raised" role="region" aria-label="Unsaved changes">
@@ -390,6 +552,83 @@ export class WorkspaceComponent {
   protected readonly stream = injectExposureEvents(this.id);
   protected readonly save = useSaveGroupsMutation(this.id);
   protected readonly setUrl = useSetUrlMutation(this.id);
+  protected readonly act = useExposureActionMutation(this.id);
+
+  // ---- Planning, confirming, retrying, cancelling ------------------------------
+
+  protected readonly confirmOpen = signal(false);
+  protected readonly cancelOpen = signal(false);
+  protected readonly actError = signal<string | null>(null);
+
+  protected readonly planPart = computed<PlanPart | null>(() => {
+    const view = this.view();
+    return view.startsWith('plan:') && this.exposure()?.plan ? (view.slice(5) as PlanPart) : null;
+  });
+  protected readonly cancellable = computed(() => {
+    const status = this.exposure()?.status;
+    return status === 'grouping' || status === 'planning' || status === 'awaiting_confirmation' || status === 'failed';
+  });
+  /** Why a plan cannot be requested now, or null. */
+  protected readonly planBlocker = computed(() => {
+    const e = this.exposure();
+    if (!e) return 'Loading';
+    if (this.dirty()) return 'Save or discard the grouping first';
+    if (e.blocked_by.length) return `${e.blocked_by.length} thing${e.blocked_by.length === 1 ? '' : 's'} block planning`;
+    return null;
+  });
+  protected readonly agentWorking = computed(() => {
+    const status = this.exposure()?.status;
+    return status === 'planning' || status === 'cancelling' || status === 'deploying';
+  });
+  /** The agent's steps for the current version: each step's latest report. */
+  protected readonly progress = computed(() => {
+    const version = this.exposure()?.version;
+    const latest = new Map<string, { step: string; state: string; message: string }>();
+    for (const ev of this.stream.events()) {
+      if (ev.type !== 'agent_step' || ev.payload['version'] !== version) continue;
+      const step = String(ev.payload['step']);
+      latest.set(step, { step, state: String(ev.payload['state']), message: String(ev.payload['message'] ?? '') });
+    }
+    return [...latest.values()];
+  });
+  protected readonly warningCount = computed(
+    () => (this.exposure()?.services.reduce((n, s) => n + s.warnings.length, 0) ?? 0) + 1
+  );
+  protected readonly heldIps = computed(() => {
+    const plan = this.exposure()?.plan;
+    return plan ? [...plan.vips.map((v) => v.ip), ...(plan.app.existing ? [] : [plan.app.ip])] : [];
+  });
+
+  protected planView(part: string): View {
+    return `plan:${part}` as View;
+  }
+
+  protected phaseLabel(phase: string): string {
+    return ({ planning: 'Planning', deploying: 'Deploying', cancelling: 'Cancelling' } as Record<string, string>)[phase] ?? phase;
+  }
+
+  protected run(action: 'plan' | 'confirm' | 'retry' | 'cancel'): void {
+    const e = this.exposure();
+    if (!e) return;
+    this.actError.set(null);
+    this.act.mutate(
+      { action, version: e.version, plan_hash: action === 'confirm' ? (e.plan_hash ?? undefined) : undefined },
+      {
+        onSuccess: (detail) => {
+          this.confirmOpen.set(false);
+          this.cancelOpen.set(false);
+          if (action === 'confirm' || action === 'cancel') this.view.set('events');
+          if (detail.status === 'grouping') this.reset(detail);
+        },
+        onError: (err) => {
+          const error = apiError(err);
+          const reasons = (error as { blocked_by?: { message: string }[] }).blocked_by?.map((b) => b.message) ?? [];
+          this.actError.set(`Not done: ${error.message}${reasons.length ? ': ' + reasons.join(' ') : ''}.`);
+          this.cancelOpen.set(false);
+        }
+      }
+    );
+  }
 
   // ---- The grouping draft ----------------------------------------------------
 
@@ -433,6 +672,10 @@ export class WorkspaceComponent {
       const e = this.exposure();
       if (!e) return;
       const base = untracked(this.baseline);
+      if (!base || base.id !== e.id) {
+        // A newly opened exposure: start on its plan when it has one.
+        if (e.plan && e.status === 'awaiting_confirmation') this.view.set('plan:summary');
+      }
       if (!base || base.id !== e.id || !untracked(this.dirty)) this.reset(e);
     });
   }
@@ -623,10 +866,24 @@ export class WorkspaceComponent {
   });
 
   protected readonly origin = formatOrigin;
+  protected readonly primaryButton =
+    'inline-flex items-center gap-1.5 rounded-md bg-ok px-3.5 py-1.5 text-[13px] font-medium text-white shadow-card transition-opacity disabled:cursor-not-allowed disabled:opacity-50';
+  protected readonly secondaryButton =
+    'inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-[13px] font-medium hover:bg-surface-2';
+
   protected readonly icons = {
     ArrowLeft,
     ArrowRight,
+    Ban,
+    CircleCheck,
     CircleDashed,
+    FileText,
+    GitCompareArrows,
+    Globe,
+    LoaderCircle,
+    Play,
+    RotateCcw,
+    Server,
     EyeOff,
     Info,
     LayoutGrid,

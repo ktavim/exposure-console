@@ -6,7 +6,7 @@ Built with Angular 21, Tailwind, TanStack Query and MSW, like the scanner fronte
 
 ## Status
 
-Phases 2 and 3: the queue, the history and an exposure's workspace with its live event log; the grouping edited by drag and drop or the keyboard and saved; the app's and registry entries' URLs set where they block planning. Against mocked data or the real backend. The look follows prototype C (`docs/exposure-console-ui.md`): a master-and-detail workspace, light and dark themes. There's no sign-in yet.
+Phases 2 to 4: the queue, the history and an exposure's workspace with its live event log; the grouping edited by drag and drop or the keyboard and saved; the app's and registry entries' URLs set where they block planning; requesting a plan, the agent's progress, the plan review and the deploy confirmation, retry and cancel. The mock agent in `src/test/msw/handlers.ts` answers a plan request with a real plan the exposure-agent produced (`src/test/fixtures/plan.json`). Against mocked data or the real backend. The look follows prototype C (`docs/exposure-console-ui.md`): a master-and-detail workspace, light and dark themes. There's no sign-in yet.
 
 ## Run
 

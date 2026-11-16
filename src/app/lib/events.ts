@@ -40,6 +40,34 @@ export function describeEvent(event: ExposureEvent): EventPresentation {
       return { text: `Set the registry URL of ${str(p['origin']) ?? '?'} to ${str(p['url']) ?? '?'}`, tone: 'accent' };
     case 'exposure_cancelled':
       return { text: 'Cancelled the exposure', tone: 'muted' };
+    case 'plan_requested':
+      return { text: 'Requested a plan', tone: 'accent' };
+    case 'plan_ready': {
+      const s = p['summary'] as { add?: number; change?: number; destroy?: number } | undefined;
+      return { text: s ? `Planned: +${s.add ?? 0} ~${s.change ?? 0} −${s.destroy ?? 0} on the F5` : 'Planned', tone: 'ok' };
+    }
+    case 'plan_confirmed':
+      return { text: 'Confirmed the plan; deploying', tone: 'ok' };
+    case 'planning_failed':
+    case 'deploying_failed':
+    case 'cancelling_failed':
+      return { text: `${event.type.split('_')[0].replace(/^./, (c) => c.toUpperCase())} failed at ${str(p['step']) ?? '?'}: ${str(p['message']) ?? ''}`, tone: 'danger' };
+    case 'retry_requested':
+      return { text: `Retried ${str(p['phase']) ?? ''}`, tone: 'accent' };
+    case 'cancel_requested':
+      return { text: 'Asked to cancel; the agent is releasing what the exposure holds', tone: 'muted' };
+    case 'supersede_requested': {
+      const by = str(p['by']);
+      return { text: 'Superseded by a newer submission; the agent is releasing what it holds', tone: 'muted', link: by ? { prefix: '', exposureId: by } : undefined };
+    }
+    case 'agent_step': {
+      const step = str(p['step']) ?? '?';
+      const message = str(p['message']);
+      return {
+        text: `${step} ${str(p['state']) ?? ''}${message ? ': ' + message : ''}`,
+        tone: p['state'] === 'failed' ? 'danger' : p['state'] === 'done' ? 'ok' : 'neutral'
+      };
+    }
     case 'exposure_deployed':
       return { text: 'Deployed', tone: 'ok' };
     default: {

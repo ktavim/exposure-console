@@ -1,5 +1,7 @@
+import planJson from './plan.json';
 import type {
   AuthMethod,
+  Plan,
   ExposureDetail,
   ExposureEvent,
   ExposureNotice,
@@ -107,8 +109,11 @@ function blockers(app_url: string | null, services: ExposureService[]): Exposure
   return out;
 }
 
+type Derived = 'groups' | 'services' | 'blocked_by' | 'needs_vip_count' | 'blocked';
+type PlanFields = 'plan' | 'plan_hash' | 'plan_version' | 'confirmed_by' | 'confirmed_at' | 'failed';
+
 function exposure(
-  base: Omit<ExposureDetail, 'groups' | 'services' | 'blocked_by' | 'needs_vip_count' | 'blocked'>,
+  base: Omit<ExposureDetail, Derived | PlanFields> & Partial<Pick<ExposureDetail, PlanFields>>,
   groupCount: number,
   specs: ServiceSpec[]
 ): ExposureDetail {
@@ -118,6 +123,12 @@ function exposure(
     .sort((a, b) => a.host.localeCompare(b.host) || a.port - b.port);
   const blocked_by = blockers(base.app.url, services);
   return {
+    plan: null,
+    plan_hash: null,
+    plan_version: null,
+    confirmed_by: null,
+    confirmed_at: null,
+    failed: null,
     ...base,
     groups: groupIds.map((g) => ({ id: g, service_ids: services.filter((s) => s.group_id === g).map((s) => s.id) })),
     services,
@@ -126,6 +137,9 @@ function exposure(
     blocked: blocked_by.length > 0
   };
 }
+
+/** The plan the agent made for a real exposure (exposure-agent, fake adapters), renamed to Expenses. */
+export const PLAN = planJson as Plan;
 
 const payrollOld = id('exp');
 const payroll = id('exp');
@@ -189,6 +203,29 @@ export const EXPOSURES: ExposureDetail[] = [
     },
     1,
     [{ host: 'api.payroll.corp.internal', group: 0 }]
+  ),
+  exposure(
+    {
+      id: id('exp'),
+      status: 'awaiting_confirmation',
+      version: 2,
+      app: { id: 'app_expenses', name: 'Expenses', url: 'https://expenses.corp.internal' },
+      scan_id: 'd4e5f6a7b8c94d0e1f2a3b4c5d6e7f80',
+      submitted_at: '2026-11-15T09:12:00+00:00',
+      submitted_by: 'mlevi',
+      created_at: '2026-11-15T09:12:00+00:00',
+      supersedes: null,
+      superseded_by: null,
+      plan: PLAN,
+      plan_hash: 'sha256:a56fa83ee4f12c0b7d1e9a4f3b2c8d6e5f7a1b3c9d2e4f6a8b0c1d3e5f7a9b2c',
+      plan_version: 2
+    },
+    2,
+    [
+      { host: 'api.expenses.corp.internal', group: 0 },
+      { host: 'api.expenses.corp.internal', port: 8443, group: 0 },
+      { host: 'reports.corp.internal', group: 1, found_by: ['interceptor'] }
+    ]
   )
 ];
 

@@ -120,6 +120,62 @@ export interface ExposureDetail extends ExposureSummary {
   blocked_by: ExposureNotice[];
   supersedes: string | null;
   superseded_by: string | null;
+  /** The agent's plan, from awaiting_confirmation on; null before, and once the grouping changes. */
+  plan: Plan | null;
+  plan_hash: string | null;
+  plan_version: number | null;
+  confirmed_by: string | null;
+  confirmed_at: string | null;
+  /** Set while failed: the phase retry resumes, the step and the agent's message. */
+  failed: { phase: 'planning' | 'deploying' | 'cancelling'; step: string | null; message: string | null } | null;
+}
+
+export interface PlanCertificate {
+  /** Its path on the F5. The key is never in a plan. */
+  name: string;
+  names: string[];
+  expires: string;
+}
+
+export interface PlanService {
+  service_id: string;
+  original: string;
+  url: string;
+  pool: string[];
+  pool_scheme: string;
+}
+
+export interface PlanVip {
+  group_id: string;
+  ip: string;
+  certificate: PlanCertificate;
+  services: PlanService[];
+}
+
+export interface DiffLine {
+  /** '+' added, '-' removed, ' ' context, '@' a hunk header. */
+  op: '+' | '-' | ' ' | '@';
+  text: string;
+}
+
+/** What the agent planned (exposure-agent, agent/planner.py). */
+export interface Plan {
+  partition: string;
+  app: {
+    name: string;
+    url: string;
+    public_url: string;
+    ip: string;
+    /** The app's VIP is deployed already; this plan changes its rewrite map. */
+    existing: boolean;
+    certificate: PlanCertificate | null;
+  };
+  vips: PlanVip[];
+  rewrite: { original: string; url: string; source: 'new' | 'published' }[];
+  dns_records: { name: string; type: string; target: string }[];
+  declaration: Record<string, unknown>;
+  diff: DiffLine[];
+  summary: { add: number; change: number; destroy: number; ips: number; dns: number; certificates: number };
 }
 
 /** One entry of an exposure's event log: an admin's action or a step the agent reported. */

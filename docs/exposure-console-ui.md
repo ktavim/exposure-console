@@ -45,6 +45,8 @@ Decided, from prototype C: laid out like a pull request's changed files. The lef
 The screen the admin approves from, so it needs the most attention. To decide:
 
 - Syntax highlighting for the declaration and the diff.
+
+Decided while building phase 4: once an exposure has a plan, the left pane gains a Plan section (Summary, each VIP, App VIP · rewrite map, Dry-run diff, Declaration), and a planned exposure opens on its Summary. The summary leads with cards for what changes on the F5, the IPs, the DNS names and the certificates, then the DNS records the deploy will create. While the agent works, a card above the pane lists its steps for the current version as they arrive; a failed phase shows as a banner naming the step and the agent's message, with Retry in the header.
 - How each VIP's IP, DNS names, certificate and services are laid out, with each service's original origin next to the URL that replaces it.
 - How the app's rewrite map is shown, with the `published` services' entries told apart from the new ones.
 - Where the warnings sit relative to the confirm button. In C they appear only in the deploy panel, behind a count on the button; showing them in the plan review itself as well is worth considering.
@@ -86,7 +88,9 @@ Confirm deploys to the F5; cancel releases IP reservations, certificates and DNS
 - How these buttons are set apart from the rest.
 - What their dialogs show: for confirm, the plan's summary; for cancel and retry, the lists described under Console in the design doc.
 
-Decided for confirm, from prototype C: a side panel lists what deploying does, step by step, says a deploy cannot be stopped, and has a checkbox for each warning; Deploy is enabled once every one is ticked.
+Decided for confirm, from prototype C: a side panel lists what deploying does, step by step, says a deploy cannot be stopped, and has a checkbox for each warning; Deploy is enabled once every one is ticked. The header's button counts the warnings to acknowledge.
+
+Decided for cancel: a small dialog lists what the agent will release, the IPs and certificates from the plan, before a red Cancel exposure.
 
 ## Density, dark mode, accessibility
 

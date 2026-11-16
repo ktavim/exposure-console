@@ -1,9 +1,13 @@
 import { delay, http, HttpResponse, sse } from 'msw';
 import { CLOSED_STATUSES, type ExposureNotice, type ExposureStatus } from '@core/models';
 import { formatOrigin } from '@lib/origin';
-import { EXPOSURES, eventsFor, refresh, toSummary } from '../fixtures/exposures';
+import { EXPOSURES, PLAN, eventsFor, refresh, toSummary } from '../fixtures/exposures';
 
 const EDITABLE: ExposureStatus[] = ['grouping', 'planning', 'awaiting_confirmation'];
+const CANCELLABLE: ExposureStatus[] = ['grouping', 'planning', 'awaiting_confirmation', 'failed'];
+
+/** How long the mock agent takes over a phase. */
+const AGENT_MS = 2500;
 let groupIds = 0;
 
 const notFound = (what: string) => HttpResponse.json({ detail: { message: `${what} not found` } }, { status: 404 });
@@ -103,5 +107,52 @@ export const handlers = [
     for (const entry of entries) if (entry) entry.url = url.trim().replace(/\/+$/, '');
     EXPOSURES.forEach(refresh);
     return HttpResponse.json(entries[0]);
+  })
+,
+
+  // Request a plan, confirm it, retry or cancel. The mock agent answers a
+  // plan request with the fixture plan after a pause; a cancel, by closing.
+  http.post('/api/exposures/:id/:action', async ({ params, request }) => {
+    await delay(250);
+    const e = EXPOSURES.find((x) => x.id === params['id']);
+    if (!e) return notFound('exposure');
+    const action = String(params['action']);
+    const body = (await request.json()) as { version: number; plan_hash?: string };
+    const refuse = (message: string, extra: Record<string, unknown> = {}) =>
+      HttpResponse.json({ detail: { message, status: e.status, version: e.version, ...extra } }, { status: 409 });
+    if (body.version !== e.version) return refuse(`the exposure is at version ${e.version}; this was asked of version ${body.version}`);
+
+    if (action === 'plan') {
+      if (e.status !== 'grouping') return refuse(`a ${e.status} exposure cannot be planned`);
+      if (e.blocked_by.length) return refuse('the exposure cannot be planned while something blocks planning', { blocked_by: e.blocked_by });
+      e.status = 'planning';
+      const version = e.version;
+      setTimeout(() => {
+        if (e.status !== 'planning' || e.version !== version) return;
+        e.status = 'awaiting_confirmation';
+        e.plan = PLAN;
+        e.plan_hash = `sha256:mock${version}`;
+        e.plan_version = version;
+      }, AGENT_MS);
+    } else if (action === 'confirm') {
+      if (e.status !== 'awaiting_confirmation') return refuse(`a ${e.status} exposure cannot be confirmed`);
+      if (body.plan_hash !== e.plan_hash) return refuse("that is not the exposure's current plan", { plan_hash: e.plan_hash });
+      e.status = 'deploying';
+      e.confirmed_by = 'jchen';
+      e.confirmed_at = new Date().toISOString();
+    } else if (action === 'retry') {
+      if (e.status !== 'failed' || !e.failed) return refuse(`a ${e.status} exposure cannot be retried`);
+      e.status = e.failed.phase;
+      e.failed = null;
+    } else if (action === 'cancel') {
+      if (!CANCELLABLE.includes(e.status)) return refuse(`a ${e.status} exposure cannot be cancelled`);
+      e.version += 1;
+      e.status = e.plan || e.status !== 'grouping' ? 'cancelling' : 'cancelled';
+      if (e.status === 'cancelling') setTimeout(() => (e.status = 'cancelled'), AGENT_MS);
+    } else {
+      return notFound('action');
+    }
+    refresh(e);
+    return HttpResponse.json(e);
   })
 ];

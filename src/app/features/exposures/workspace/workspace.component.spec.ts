@@ -38,6 +38,7 @@ async function renderWorkspace(exposure: ExposureDetail, writes: Partial<Exposur
     saveGroups: vi.fn(async () => ({ ...exposure, version: exposure.version + 1 })),
     setAppUrl: vi.fn(async () => ({})),
     setRegistryUrl: vi.fn(async () => ({})),
+    act: vi.fn(async () => exposure),
     ...writes
   };
   const sources: FakeEventSource[] = [];
@@ -254,6 +255,91 @@ describe('WorkspaceComponent', () => {
       await userEvent.type(within(item).getByRole('textbox', { name: 'App URL' }), 'https://timesheets.corp.internal');
       await userEvent.click(within(item).getByRole('button', { name: 'Save' }));
       expect(api.setAppUrl).toHaveBeenCalledWith(e.app.id, 'https://timesheets.corp.internal');
+    });
+  });
+
+  describe('planning and confirming', () => {
+    const fresh = (i: number) => structuredClone(EXPOSURES[i]);
+    const planned = () => fresh(3);
+
+    it('opens a planned exposure on its plan', async () => {
+      const e = planned();
+      await renderWorkspace(e);
+      const pane = detail('What deploying does');
+      expect(within(pane).getByText('api-expenses.example.com')).toBeInTheDocument();
+      expect(within(pane).getByText(`+${e.plan!.summary.add}`)).toBeInTheDocument();
+      await userEvent.click(within(sidebar()).getByRole('button', { name: `VIP 1 ${e.plan!.vips[0].ip} ${e.plan!.vips[0].services.length}` }));
+      expect(within(detail('VIP 1 ' + e.plan!.vips[0].ip)).getByText('https://api-expenses-8443.example.com')).toBeInTheDocument();
+      await userEvent.click(within(sidebar()).getByRole('button', { name: /App VIP/ }));
+      expect(within(detail('App VIP · rewrite map')).getAllByText('this plan')).toHaveLength(e.plan!.rewrite.length);
+      await userEvent.click(within(sidebar()).getByRole('button', { name: /Dry-run diff/ }));
+      expect(within(detail('Dry-run diff')).getByText(`+${e.plan!.diff.filter((l) => l.op === '+').length}`)).toBeInTheDocument();
+    });
+
+    it('confirms only once every warning is acknowledged, naming the plan', async () => {
+      const e = planned();
+      const { api } = await renderWorkspace(e);
+      await userEvent.click(screen.getByRole('button', { name: /Review and deploy/ }));
+      const panel = screen.getByRole('dialog', { name: 'Deploy Expenses' });
+      const deploy = within(panel).getByRole('button', { name: 'Deploy to F5' });
+      const boxes = within(panel).getAllByRole('checkbox');
+      // The interceptor-only service's warning, and the one every app gets.
+      expect(boxes).toHaveLength(2);
+      await userEvent.click(boxes[0]);
+      expect(deploy).toBeDisabled();
+      await userEvent.click(boxes[1]);
+      await userEvent.click(deploy);
+      expect(api.act).toHaveBeenCalledWith(e.id, 'confirm', { version: 2, plan_hash: e.plan_hash });
+    });
+
+    it('requests a plan when nothing blocks it, and not otherwise', async () => {
+      const ready = fresh(0);
+      const { api } = await renderWorkspace(ready);
+      await userEvent.click(screen.getByRole('button', { name: /Request plan/ }));
+      expect(api.act).toHaveBeenCalledWith(ready.id, 'plan', { version: 1, plan_hash: undefined });
+    });
+
+    it('will not request a plan while something blocks it', async () => {
+      await renderWorkspace(fresh(1));
+      expect(screen.getByRole('button', { name: /Request plan/ })).toBeDisabled();
+    });
+
+    it('says where a phase failed, and retries it', async () => {
+      const e = { ...planned(), status: 'failed' as const, plan: null, failed: { phase: 'planning' as const, step: 'dry_run', message: 'AS3 refused the declaration' } };
+      const { api } = await renderWorkspace(e);
+      expect(screen.getByRole('alert')).toHaveTextContent('Planning failed at dry_run.');
+      expect(screen.getByRole('alert')).toHaveTextContent('AS3 refused the declaration');
+      await userEvent.click(screen.getByRole('button', { name: /Retry planning/ }));
+      expect(api.act).toHaveBeenCalledWith(e.id, 'retry', { version: 2, plan_hash: undefined });
+    });
+
+    it('cancels after saying what will be released', async () => {
+      const e = planned();
+      const { api } = await renderWorkspace(e);
+      await userEvent.click(screen.getByRole('button', { name: /Cancel exposure/ }));
+      const dialog = screen.getByRole('alertdialog', { name: 'Cancel this exposure?' });
+      expect(dialog).toHaveTextContent(e.plan!.vips[0].ip);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel exposure' }));
+      expect(api.act).toHaveBeenCalledWith(e.id, 'cancel', { version: 2, plan_hash: undefined });
+    });
+
+    it("shows the agent's steps for the current version while it plans", async () => {
+      const e = { ...fresh(0), status: 'planning' as const };
+      const { source } = await renderWorkspace(e);
+      source().open();
+      const step = (seq: number, version: number, name: string, state: string, message = '') =>
+        source().emit({ exposure_id: e.id, seq: String(seq), ts: 0, type: 'agent_step', actor: 'agent', payload: { version, step: name, state, message } });
+      step(0, 0, 'old_step', 'done');
+      step(1, 1, 'reserve_ips', 'started');
+      step(2, 1, 'reserve_ips', 'done', 'grp_1 203.0.113.1');
+      step(3, 1, 'certificates', 'started');
+      const progress = await screen.findByRole('status', { name: 'Agent progress' });
+      await waitFor(() =>
+        expect(within(progress).getAllByRole('listitem').map((li) => li.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+          expect.stringMatching(/^reserve_ips\s*grp_1 203\.0\.113\.1$/),
+          'certificates'
+        ])
+      );
     });
   });
 });
