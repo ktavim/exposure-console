@@ -36,9 +36,6 @@ export class ExposuresApi {
   saveGroups = (id: string, body: SaveGroupingBody): Promise<ExposureDetail> =>
     firstValueFrom(this.http.put<ExposureDetail>(`${this.base}/exposures/${id}/groups`, body));
 
-  setAppUrl = (appId: string, url: string): Promise<unknown> =>
-    firstValueFrom(this.http.patch(`${this.base}/apps/${appId}`, { url }));
-
   /** POST /exposures/{id}/{action}: plan, confirm, retry or cancel, against a version. */
   act = (id: string, action: ExposureAction, body: { version: number; plan_hash?: string }): Promise<ExposureDetail> =>
     firstValueFrom(this.http.post<ExposureDetail>(`${this.base}/exposures/${id}/${action}`, body));

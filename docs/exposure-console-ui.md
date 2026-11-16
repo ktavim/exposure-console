@@ -70,7 +70,7 @@ Decided while building phase 3:
 - When another admin saves while this one has unsaved changes, the board keeps them and shows a banner naming who saved and the new version, with Reload, which discards them; Save is disabled meanwhile.
 - In `planning` and `awaiting_confirmation` the board is editable, under a note that saving drops the plan; past that it is read-only.
 - A refused save says why in the bar; a refusal per service marks the cards it names in red.
-- The app's URL and a registry entry's URL are set inline, where the blocker is listed, with the server's error under the field.
+- A registry entry's URL is set inline, where the blocker is listed, with the server's error under the field. (The app's URL used to be set the same way; every app has one now, required when the app is created.)
 
 ## Progress and failure
 

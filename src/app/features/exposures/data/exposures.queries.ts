@@ -52,13 +52,12 @@ export function useSaveGroupsMutation(id: () => string) {
   }));
 }
 
-/** Set the app's URL, or a registry entry's; either changes what blocks the exposure's planning. */
+/** Set a registry entry's URL, which an exposure that calls its origin needs to be planned. */
 export function useSetUrlMutation(id: () => string) {
   const api = inject(ExposuresApi);
   const client = inject(QueryClient);
   return injectMutation(() => ({
-    mutationFn: (target: { kind: 'app' | 'registry'; targetId: string; url: string }) =>
-      target.kind === 'app' ? api.setAppUrl(target.targetId, target.url) : api.setRegistryUrl(target.targetId, target.url),
+    mutationFn: (target: { entryId: string; url: string }) => api.setRegistryUrl(target.entryId, target.url),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: exposureKeys.detail(id()) });
       void client.invalidateQueries({ queryKey: exposureKeys.queue() });

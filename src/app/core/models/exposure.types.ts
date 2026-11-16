@@ -75,7 +75,8 @@ export interface ExposureNotice {
 export interface ExposureApp {
   id: string;
   name: string;
-  url: string | null;
+  /** Every app has one; its VIP is built from it. */
+  url: string;
 }
 
 export interface ExposureSummary {

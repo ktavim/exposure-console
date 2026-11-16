@@ -86,9 +86,8 @@ function service(spec: ServiceSpec, groupIds: string[]): ExposureService {
 }
 
 /** What core.exposures.assess blocks planning on. */
-function blockers(app_url: string | null, services: ExposureService[]): ExposureNotice[] {
+function blockers(services: ExposureService[]): ExposureNotice[] {
   const out: ExposureNotice[] = [];
-  if (!app_url) out.push({ code: 'app_url_missing', message: 'The app has no URL; set one to plan its VIP.', service_id: null });
   for (const s of services) {
     const origin = formatOrigin(s);
     if (s.scope === 'needs_vip' && !s.group_id) {
@@ -124,7 +123,7 @@ function exposure(
   const services = specs
     .map((spec) => service(spec, groupIds))
     .sort((a, b) => a.host.localeCompare(b.host) || a.port - b.port);
-  const blocked_by = blockers(base.app.url, services);
+  const blocked_by = blockers(services);
   return {
     plan: null,
     plan_hash: null,
@@ -234,7 +233,7 @@ export const EXPOSURES: ExposureDetail[] = [
       id: id('exp'),
       status: 'grouping',
       version: 3,
-      app: { id: 'app_timesheets', name: 'Timesheets', url: null },
+      app: { id: 'app_timesheets', name: 'Timesheets', url: 'https://timesheets.corp.internal' },
       scan_id: 'c1d2e3f4a5b64c7d8e9f0a1b2c3d4e5f',
       submitted_at: '2026-11-14T13:05:00+00:00',
       submitted_by: 'rkatz',
@@ -349,7 +348,7 @@ export const EXPOSURES: ExposureDetail[] = [
 
 /** Recompute what the backend derives, after a mock write changed an exposure. */
 export function refresh(e: ExposureDetail): void {
-  e.blocked_by = blockers(e.app.url, e.services);
+  e.blocked_by = blockers(e.services);
   e.blocked = e.blocked_by.length > 0;
   e.needs_vip_count = e.services.filter((s) => s.scope === 'needs_vip').length;
 }

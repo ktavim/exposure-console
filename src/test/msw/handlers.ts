@@ -187,19 +187,6 @@ export const handlers = [
     return HttpResponse.json(e);
   }),
 
-  http.patch('/api/apps/:id', async ({ params, request }) => {
-    await delay(300);
-    const { url } = (await request.json()) as { url: string };
-    if (!/^https?:\/\/[^/\s]+/i.test(url.trim())) return invalid('Value error, the URL must start with http:// or https://');
-    const mine = EXPOSURES.filter((e) => e.app.id === params['id']);
-    if (!mine.length) return notFound('app');
-    for (const e of mine) {
-      e.app.url = url.trim().replace(/\/+$/, '');
-      refresh(e);
-    }
-    return HttpResponse.json({ id: params['id'], url: mine[0].app.url });
-  }),
-
   http.patch('/api/published-origins/:id', async ({ params, request }) => {
     await delay(300);
     const { url } = (await request.json()) as { url: string };

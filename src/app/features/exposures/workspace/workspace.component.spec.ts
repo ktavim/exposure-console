@@ -36,7 +36,6 @@ async function renderWorkspace(exposure: ExposureDetail, writes: Partial<Exposur
       return exposure;
     },
     saveGroups: vi.fn(async () => ({ ...exposure, version: exposure.version + 1 })),
-    setAppUrl: vi.fn(async () => ({})),
     setRegistryUrl: vi.fn(async () => ({})),
     act: vi.fn(async () => exposure),
     ...writes
@@ -97,8 +96,13 @@ describe('WorkspaceComponent', () => {
   });
 
   it('lists what blocks planning, and the app-wide reasons on the board too', async () => {
-    await renderWorkspace(blocked);
-    expect(within(detail('VIP groups')).getByText(/The app has no URL/)).toBeInTheDocument();
+    const deploying = {
+      code: 'earlier_exposure_deploying',
+      message: 'exp_0000000099, an earlier submission of this app, is still deploying; plan once it has finished.',
+      service_id: null
+    };
+    await renderWorkspace({ ...structuredClone(blocked), blocked_by: [...blocked.blocked_by, deploying] });
+    expect(within(detail('VIP groups')).getByText(/is still deploying/)).toBeInTheDocument();
     await userEvent.click(within(sidebar()).getByRole('button', { name: /What blocks planning/ }));
     const pane = detail('What blocks planning');
     expect(within(pane).getByText(/uses Kerberos/)).toBeInTheDocument();
@@ -245,16 +249,17 @@ describe('WorkspaceComponent', () => {
       expect(saveBar()).toBeNull();
     });
 
-    it('sets the app URL from what blocks planning', async () => {
+    it("sets a registry entry's URL from what blocks planning", async () => {
       const e = fresh(1);
+      const entry = e.services.find((s) => s.host === 'files.corp.internal')!.registry_entry!;
       const { api } = await renderWorkspace(e);
       await userEvent.click(within(sidebar()).getByRole('button', { name: /What blocks planning/ }));
       const pane = detail('What blocks planning');
-      const item = within(pane).getByText(/The app has no URL/).closest('li')!;
+      const item = within(pane).getByText(/registry entry has no URL/).closest('li')!;
       await userEvent.click(within(item).getByRole('button', { name: 'Set URL' }));
-      await userEvent.type(within(item).getByRole('textbox', { name: 'App URL' }), 'https://timesheets.corp.internal');
+      await userEvent.type(within(item).getByRole('textbox', { name: 'Registry URL' }), 'https://files.example.com');
       await userEvent.click(within(item).getByRole('button', { name: 'Save' }));
-      expect(api.setAppUrl).toHaveBeenCalledWith(e.app.id, 'https://timesheets.corp.internal');
+      expect(api.setRegistryUrl).toHaveBeenCalledWith(entry.id, 'https://files.example.com');
     });
   });
 

@@ -34,8 +34,6 @@ export function describeEvent(event: ExposureEvent): EventPresentation {
       const saved = typeof version === 'number' ? `Saved the grouping (version ${version})` : 'Saved the grouping';
       return { text: str(p['from_status']) ? `${saved}; the plan was dropped` : saved, tone: 'neutral' };
     }
-    case 'app_url_set':
-      return { text: `Set the app's URL to ${str(p['url']) ?? '?'}`, tone: 'accent' };
     case 'registry_url_set':
       return { text: `Set the registry URL of ${str(p['origin']) ?? '?'} to ${str(p['url']) ?? '?'}`, tone: 'accent' };
     case 'exposure_cancelled':

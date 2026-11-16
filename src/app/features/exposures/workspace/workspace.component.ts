@@ -62,9 +62,6 @@ type View =
   | `group:${string}`
   | `plan:${PlanPart}`;
 
-/** Where a URL is being set: the app's, or one registry entry's (by its id). */
-type UrlTarget = { kind: 'app'; targetId: string } | { kind: 'registry'; targetId: string };
-
 /** The statuses whose grouping can change; saving in the last two drops the plan. */
 const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_confirmation'];
 
@@ -155,9 +152,6 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
                   <span>{{ m.prefix }} <a [routerLink]="['/exposures', m.link]" class="font-mono text-[12.5px] text-accent hover:underline">{{ m.link }}</a></span>
                 } @else {
                   <span>{{ m.text }}</span>
-                }
-                @if (m.label === 'App URL' && !e.app.url && editable()) {
-                  <button type="button" class="ml-1 font-sans text-xs font-medium text-accent hover:underline" (click)="openUrlForm({ kind: 'app', targetId: e.app.id })">Set URL</button>
                 }
               </dd>
             </div>
@@ -309,21 +303,21 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
                             <lucide-icon [img]="icons.OctagonAlert" [size]="14" aria-hidden="true" />
                           </span>
                           <span class="flex-1 leading-relaxed">{{ n.message }}</span>
-                          @if (fixFor(e, n); as target) {
-                            @if (!isEditingUrl(target) && editable()) {
-                              <button type="button" [class]="linkButton" (click)="openUrlForm(target)">Set URL</button>
+                          @if (entryToFix(e, n); as entryId) {
+                            @if (!isEditingUrl(entryId) && editable()) {
+                              <button type="button" [class]="linkButton" (click)="openUrlForm(entryId)">Set URL</button>
                             }
                           }
                         </div>
-                        @if (fixFor(e, n); as target) {
-                          @if (isEditingUrl(target)) {
+                        @if (entryToFix(e, n); as entryId) {
+                          @if (isEditingUrl(entryId)) {
                             <div class="mt-3 pl-9">
                               <app-url-form
-                                [label]="target.kind === 'app' ? 'App URL' : 'Registry URL'"
-                                [placeholder]="target.kind === 'app' ? 'https://payroll.corp.internal' : 'https://name.example.com'"
+                                label="Registry URL"
+                                placeholder="https://name.example.com"
                                 [pending]="setUrl.isPending()"
                                 [error]="urlError()"
-                                (saved)="saveUrl(target, $event)"
+                                (saved)="saveUrl(entryId, $event)"
                                 (cancelled)="closeUrlForm()"
                               />
                             </div>
@@ -354,20 +348,20 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
                               <span [class]="dangerPill"><lucide-icon [img]="icons.OctagonAlert" [size]="12" aria-hidden="true" />registry entry removed</span>
                             } @else if (s.registry_entry?.url) {
                               {{ s.registry_entry?.url }}
-                            } @else if (s.registry_entry && isEditingUrl({ kind: 'registry', targetId: s.registry_entry.id })) {
+                            } @else if (s.registry_entry && isEditingUrl(s.registry_entry.id)) {
                               <app-url-form
                                 label="Registry URL"
                                 placeholder="https://name.example.com"
                                 [pending]="setUrl.isPending()"
                                 [error]="urlError()"
-                                (saved)="saveUrl({ kind: 'registry', targetId: s.registry_entry.id }, $event)"
+                                (saved)="saveUrl(s.registry_entry.id, $event)"
                                 (cancelled)="closeUrlForm()"
                               />
                             } @else {
                               <span class="flex items-center gap-2">
                                 <span [class]="dangerPill"><lucide-icon [img]="icons.OctagonAlert" [size]="12" aria-hidden="true" />no URL</span>
                                 @if (s.registry_entry && editable()) {
-                                  <button type="button" [class]="linkButton" (click)="openUrlForm({ kind: 'registry', targetId: s.registry_entry.id })">Set URL</button>
+                                  <button type="button" [class]="linkButton" (click)="openUrlForm(s.registry_entry.id)">Set URL</button>
                                 }
                               </span>
                             }
@@ -463,9 +457,6 @@ const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_c
                         <li>{{ n.message }}</li>
                       }
                     </ul>
-                    @if (editable()) {
-                      <button type="button" [class]="linkButton" (click)="openUrlForm({ kind: 'app', targetId: e.app.id })">Set URL</button>
-                    }
                   </div>
                 }
 
@@ -801,19 +792,19 @@ export class WorkspaceComponent {
     });
   }
 
-  // ---- Fixing blockers: the app's URL, a registry entry's URL ----------------
+  // ---- Fixing a blocker: a registry entry's URL --------------------------------
 
+  /** The registry entry whose URL is being set, by its id. */
   protected readonly editingUrl = signal<string | null>(null);
   protected readonly urlError = signal<string | null>(null);
 
-  protected isEditingUrl(target: UrlTarget): boolean {
-    return this.editingUrl() === `${target.kind}:${target.targetId}`;
+  protected isEditingUrl(entryId: string): boolean {
+    return this.editingUrl() === entryId;
   }
 
-  protected openUrlForm(target: UrlTarget): void {
+  protected openUrlForm(entryId: string): void {
     this.urlError.set(null);
-    this.editingUrl.set(`${target.kind}:${target.targetId}`);
-    if (target.kind === 'app' && this.view() !== 'blocked') this.view.set('blocked');
+    this.editingUrl.set(entryId);
   }
 
   protected closeUrlForm(): void {
@@ -821,10 +812,10 @@ export class WorkspaceComponent {
     this.urlError.set(null);
   }
 
-  protected saveUrl(target: UrlTarget, url: string): void {
+  protected saveUrl(entryId: string, url: string): void {
     this.urlError.set(null);
     this.setUrl.mutate(
-      { ...target, url },
+      { entryId, url },
       {
         onSuccess: () => this.closeUrlForm(),
         onError: (err) => this.urlError.set(apiError(err).message)
@@ -832,14 +823,10 @@ export class WorkspaceComponent {
     );
   }
 
-  /** The URL that fixes a blocker, when one does. */
-  protected fixFor(e: ExposureDetail, n: ExposureNotice): UrlTarget | null {
-    if (n.code === 'app_url_missing') return { kind: 'app', targetId: e.app.id };
-    if (n.code === 'published_url_missing') {
-      const entry = e.services.find((s) => s.id === n.service_id)?.registry_entry;
-      return entry ? { kind: 'registry', targetId: entry.id } : null;
-    }
-    return null;
+  /** The registry entry whose missing URL a blocker names, when it does. */
+  protected entryToFix(e: ExposureDetail, n: ExposureNotice): string | null {
+    if (n.code !== 'published_url_missing') return null;
+    return e.services.find((s) => s.id === n.service_id)?.registry_entry?.id ?? null;
   }
 
   // ---- What the panes show ---------------------------------------------------
@@ -923,7 +910,7 @@ export class WorkspaceComponent {
       prefix?: string;
       link?: string;
     }[] = [
-      { label: 'App URL', icon: Globe, text: e.app.url ?? 'no URL', mono: true, danger: !e.app.url },
+      { label: 'App URL', icon: Globe, text: e.app.url, mono: true },
       { label: 'Scan', icon: Radar, text: e.scan_id.slice(0, 8), mono: true, title: e.scan_id },
       { label: 'Submitted by', icon: User, text: e.submitted_by },
       { label: 'Submitted', icon: Clock, text: formatDate(e.submitted_at, 'MMM d, y · HH:mm', 'en-US') }
