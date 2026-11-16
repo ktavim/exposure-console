@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { provideRouter } from '@angular/router';
@@ -5,6 +6,7 @@ import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-exper
 import type { ExposureDetail, ExposureEvent } from '@core/models';
 import { EXPOSURES, eventsFor } from '../../../../test/fixtures/exposures';
 import { EVENT_SOURCE } from '../data/exposure-events';
+import { exposureKeys } from '../data/exposures.queries';
 import { ExposuresApi } from '../data/exposures.api';
 import { WorkspaceComponent } from './workspace.component';
 
@@ -26,20 +28,25 @@ class FakeEventSource {
   }
 }
 
-async function renderWorkspace(exposure: ExposureDetail) {
+async function renderWorkspace(exposure: ExposureDetail, writes: Partial<ExposuresApi> = {}) {
   const fetches = { count: 0 };
-  const api: Partial<ExposuresApi> = {
+  const api = {
     get: async () => {
       fetches.count++;
       return exposure;
-    }
+    },
+    saveGroups: vi.fn(async () => ({ ...exposure, version: exposure.version + 1 })),
+    setAppUrl: vi.fn(async () => ({})),
+    setRegistryUrl: vi.fn(async () => ({})),
+    ...writes
   };
   const sources: FakeEventSource[] = [];
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await render(WorkspaceComponent, {
     componentInputs: { id: exposure.id },
     providers: [
       provideRouter([]),
-      provideTanStackQuery(new QueryClient({ defaultOptions: { queries: { retry: false } } })),
+      provideTanStackQuery(client),
       { provide: ExposuresApi, useValue: api },
       {
         provide: EVENT_SOURCE,
@@ -52,7 +59,7 @@ async function renderWorkspace(exposure: ExposureDetail) {
     ]
   });
   await screen.findByRole('heading', { level: 1, name: exposure.app.name });
-  return { fetches, source: () => sources[sources.length - 1] };
+  return { fetches, api, client, source: () => sources[sources.length - 1] };
 }
 
 const sidebar = () => screen.getByRole('complementary', { name: 'Exposure sections' });
@@ -133,6 +140,120 @@ describe('WorkspaceComponent', () => {
       expect(fetches.count).toBe(1);
       source().emit({ ...old[0], seq: String(old.length), ts: Date.now(), type: 'grouping_saved', actor: 'dcohen', payload: { version: 2 } });
       await waitFor(() => expect(fetches.count).toBe(2));
+    });
+  });
+
+  describe('editing the grouping', () => {
+    // Each test edits its own copy; the fixtures stay as they are.
+    const fresh = (i: number) => structuredClone(EXPOSURES[i]);
+    const card = (origin: string) => screen.getByRole('article', { name: origin });
+    const saveBar = () => screen.queryByRole('region', { name: 'Unsaved changes' });
+    const conflict = (status: number, detail: unknown) =>
+      new HttpErrorResponse({ status, statusText: 'Error', error: { detail } });
+
+    it('moves a card with the keyboard and saves the whole grouping', async () => {
+      const e = fresh(0);
+      const { api } = await renderWorkspace(e);
+      expect(saveBar()).toBeNull();
+      card('https://reports.corp.internal').focus();
+      await userEvent.keyboard('1');
+      expect(within(screen.getByRole('group', { name: /^VIP 1/ })).getByRole('article', { name: 'https://reports.corp.internal' })).toBeInTheDocument();
+      // The card keeps the focus in its new column.
+      await waitFor(() => expect(card('https://reports.corp.internal')).toHaveFocus());
+      expect(saveBar()).toHaveTextContent('Unsaved changes to the grouping');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Save grouping' }));
+      const id = (host: string, port = 443) => e.services.find((s) => s.host === host && s.port === port)!.id;
+      expect(api.saveGroups).toHaveBeenCalledWith(e.id, {
+        version: e.version,
+        groups: [
+          { id: e.groups[0].id, service_ids: [id('api.payroll.corp.internal'), id('api.payroll.corp.internal', 8443), id('reports.corp.internal')] },
+          { id: e.groups[1].id, service_ids: [id('sso.corp.internal')] }
+        ]
+      });
+      await waitFor(() => expect(saveBar()).toBeNull());
+    });
+
+    it('will not save while a service is in no group', async () => {
+      await renderWorkspace(fresh(0));
+      card('https://sso.corp.internal').focus();
+      await userEvent.keyboard('0');
+      expect(within(screen.getByRole('group', { name: 'Not grouped' })).getByRole('article')).toBeInTheDocument();
+      expect(saveBar()).toHaveTextContent('Put the service that is not in a group into one to save.');
+      expect(screen.getByRole('button', { name: 'Save grouping' })).toBeDisabled();
+    });
+
+    it('makes a new VIP with N, and discards back to the saved grouping', async () => {
+      await renderWorkspace(fresh(0));
+      card('https://sso.corp.internal').focus();
+      await userEvent.keyboard('n');
+      expect(within(screen.getByRole('group', { name: /^VIP 3/ })).getByRole('article', { name: 'https://sso.corp.internal' })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Discard' }));
+      expect(screen.queryByRole('group', { name: /^VIP 3/ })).toBeNull();
+      expect(saveBar()).toBeNull();
+    });
+
+    it('says why a save was refused for a stale version', async () => {
+      const e = fresh(0);
+      await renderWorkspace(e, {
+        saveGroups: vi.fn(async () => {
+          throw conflict(409, { message: 'the exposure is at version 2; this grouping was made against version 1', status: 'grouping', version: 2 });
+        })
+      });
+      card('https://reports.corp.internal').focus();
+      await userEvent.keyboard('1');
+      await userEvent.click(screen.getByRole('button', { name: 'Save grouping' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Not saved: the exposure is at version 2');
+    });
+
+    it('marks the cards the server refused', async () => {
+      const e = fresh(0);
+      const sso = e.services.find((s) => s.host === 'sso.corp.internal')!;
+      await renderWorkspace(e, {
+        saveGroups: vi.fn(async () => {
+          throw conflict(422, {
+            message: 'each service that needs a VIP must be in exactly one group',
+            errors: [{ code: 'not_in_scope', message: 'https://sso.corp.internal does not need a VIP (published).', service_id: sso.id }]
+          });
+        })
+      });
+      card('https://reports.corp.internal').focus();
+      await userEvent.keyboard('1');
+      await userEvent.click(screen.getByRole('button', { name: 'Save grouping' }));
+      expect(await within(card('https://sso.corp.internal')).findByText(/does not need a VIP/)).toBeInTheDocument();
+    });
+
+    it('keeps unsaved changes when someone else saves, and offers to reload', async () => {
+      const e = fresh(0);
+      const { client } = await renderWorkspace(e);
+      card('https://reports.corp.internal').focus();
+      await userEvent.keyboard('1');
+      client.setQueryData(exposureKeys.detail(e.id), { ...e, version: e.version + 1 });
+      expect(await screen.findByText(/changed this exposure while you were editing \(now version 2\)/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save grouping' })).toBeDisabled();
+      await userEvent.click(screen.getByRole('button', { name: 'Reload' }));
+      expect(saveBar()).toBeNull();
+      expect(within(screen.getByRole('group', { name: /^VIP 2/ })).getByRole('article', { name: 'https://reports.corp.internal' })).toBeInTheDocument();
+    });
+
+    it('leaves a closed exposure read-only', async () => {
+      await renderWorkspace(fresh(2));
+      card('https://api.payroll.corp.internal').focus();
+      await userEvent.keyboard('n');
+      expect(screen.queryByRole('group', { name: /^VIP 2/ })).toBeNull();
+      expect(saveBar()).toBeNull();
+    });
+
+    it('sets the app URL from what blocks planning', async () => {
+      const e = fresh(1);
+      const { api } = await renderWorkspace(e);
+      await userEvent.click(within(sidebar()).getByRole('button', { name: /What blocks planning/ }));
+      const pane = detail('What blocks planning');
+      const item = within(pane).getByText(/The app has no URL/).closest('li')!;
+      await userEvent.click(within(item).getByRole('button', { name: 'Set URL' }));
+      await userEvent.type(within(item).getByRole('textbox', { name: 'App URL' }), 'https://timesheets.corp.internal');
+      await userEvent.click(within(item).getByRole('button', { name: 'Save' }));
+      expect(api.setAppUrl).toHaveBeenCalledWith(e.app.id, 'https://timesheets.corp.internal');
     });
   });
 });

@@ -1,5 +1,5 @@
-import { formatDate, NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { formatDate } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, effect, input, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   ArrowLeft,
@@ -9,46 +9,55 @@ import {
   EyeOff,
   GitCompareArrows,
   Globe,
-  KeyRound,
+  Info,
   LayoutGrid,
   LucideAngularModule,
   OctagonAlert,
   Radar,
-  Server,
-  Share2,
+  RefreshCw,
   ScrollText,
-  TriangleAlert,
+  Share2,
   User
 } from 'lucide-angular';
-import type { ExposureDetail, ExposureNotice, ExposureService } from '@core/models';
+import type { ExposureDetail, ExposureNotice, ExposureStatus } from '@core/models';
 import { type EventTone, describeEvent } from '@lib/events';
+import {
+  type GroupingDraft,
+  addGroup,
+  draftFrom,
+  isDirty,
+  moveService,
+  moveToNewGroup,
+  removeGroup,
+  saveBlocker,
+  toRequest
+} from '@lib/grouping-draft';
+import { apiError } from '@lib/http-error';
 import { formatOrigin } from '@lib/origin';
 import { StatusBadgeComponent } from '@shared/status-badge.component';
+import { UrlFormComponent } from '@shared/url-form.component';
 import { injectExposureEvents } from '../data/exposure-events';
-import { useExposureQuery } from '../data/exposures.queries';
+import { useExposureQuery, useSaveGroupsMutation, useSetUrlMutation } from '../data/exposures.queries';
+import { GroupingBoardComponent, type MoveRequest } from './grouping-board.component';
 
 /** What the right pane shows: all the groups, one of them, or a section. */
 type View = 'board' | 'blocked' | 'published' | 'excluded' | 'events' | `group:${string}`;
 
-interface GroupView {
-  id: string;
-  /** 1-based, as the admin reads it. */
-  number: number;
-  label: string;
-  hosts: string;
-  services: ExposureService[];
-  blocked: boolean;
-}
+/** Where a URL is being set: the app's, or one registry entry's (by its id). */
+type UrlTarget = { kind: 'app'; targetId: string } | { kind: 'registry'; targetId: string };
+
+/** The statuses whose grouping can change; saving in the last two drops the plan. */
+const EDITABLE: readonly ExposureStatus[] = ['grouping', 'planning', 'awaiting_confirmation'];
 
 /**
  * One exposure, master and detail (docs/exposure-console-ui.md, Grouping):
  * the left pane lists the groups and sections, the right pane shows the one
- * selected. Read-only for now; moving services between groups is phase 3.
+ * selected. The grouping is edited as a draft and saved whole.
  */
 @Component({
   selector: 'app-workspace',
   standalone: true,
-  imports: [NgTemplateOutlet, RouterLink, StatusBadgeComponent, LucideAngularModule],
+  imports: [RouterLink, StatusBadgeComponent, LucideAngularModule, GroupingBoardComponent, UrlFormComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex flex-col h-full' },
   template: `
@@ -87,6 +96,9 @@ interface GroupView {
                 } @else {
                   <span>{{ m.text }}</span>
                 }
+                @if (m.label === 'App URL' && !e.app.url && editable()) {
+                  <button type="button" class="ml-1 font-sans text-xs font-medium text-accent hover:underline" (click)="openUrlForm({ kind: 'app', targetId: e.app.id })">Set URL</button>
+                }
               </dd>
             </div>
           }
@@ -97,7 +109,11 @@ interface GroupView {
         <aside class="overflow-auto border-r border-border bg-side px-3 py-4" aria-label="Exposure sections">
           <button type="button" [class]="item('board')" [attr.aria-current]="view() === 'board'" (click)="view.set('board')">
             <lucide-icon [img]="icons.LayoutGrid" [size]="15" class="text-fg-muted" aria-hidden="true" />
-            <span class="flex-1">All VIP groups</span><span [class]="count(false)">{{ groups().length }}</span>
+            <span class="flex-1">All VIP groups</span>
+            @if (dirty()) {
+              <span class="size-1.5 rounded-full bg-warn" title="Unsaved changes" aria-label="unsaved changes"></span>
+            }
+            <span [class]="count(false)">{{ sideGroups().length }}</span>
           </button>
           <button type="button" [class]="item('blocked')" [attr.aria-current]="view() === 'blocked'" (click)="view.set('blocked')">
             <lucide-icon [img]="icons.OctagonAlert" [size]="15" [class]="e.blocked_by.length ? 'text-danger' : 'text-fg-muted'" aria-hidden="true" />
@@ -105,23 +121,23 @@ interface GroupView {
           </button>
 
           <h3 [class]="heading">VIP groups</h3>
-          @for (g of groups(); track g.id) {
+          @for (g of sideGroups(); track g.key) {
             <button
               type="button"
-              [class]="item(groupView(g.id))"
-              [attr.aria-current]="view() === groupView(g.id)"
-              [attr.aria-label]="g.label + ', ' + g.services.length + ' services' + (g.blocked ? ', blocked' : '')"
-              (click)="view.set(groupView(g.id))"
+              [class]="item(groupView(g.key))"
+              [attr.aria-current]="view() === groupView(g.key)"
+              [attr.aria-label]="g.label + ', ' + g.count + ' services' + (g.blocked ? ', blocked' : '')"
+              (click)="view.set(groupView(g.key))"
             >
               <span [class]="vipBadge(g.blocked)" aria-hidden="true">{{ g.number }}</span>
-              <span class="flex-1 truncate">{{ g.hosts || 'Empty' }}</span>
-              <span [class]="count(false)">{{ g.services.length }}</span>
+              <span class="flex-1 truncate" [class.italic]="!g.hosts" [class.text-fg-subtle]="!g.hosts">{{ g.hosts || 'Empty' }}</span>
+              <span [class]="count(false)">{{ g.count }}</span>
             </button>
           }
-          @if (ungrouped().length) {
+          @if (draft()?.ungrouped?.length) {
             <button type="button" [class]="item('none')" (click)="view.set('board')">
               <lucide-icon [img]="icons.CircleDashed" [size]="15" class="text-danger" aria-hidden="true" />
-              <span class="flex-1 text-danger">Not grouped</span><span [class]="count(true)">{{ ungrouped().length }}</span>
+              <span class="flex-1 text-danger">Not grouped</span><span [class]="count(true)">{{ draft()?.ungrouped?.length }}</span>
             </button>
           }
 
@@ -146,180 +162,222 @@ interface GroupView {
           </button>
         </aside>
 
-        <section class="overflow-auto px-7 pb-12 pt-6" aria-labelledby="detail-heading">
-          @switch (view()) {
-            @case ('blocked') {
-              <h2 id="detail-heading" [class]="title">What blocks planning</h2>
-              <p [class]="subtitle">Each of these keeps a plan from being requested. They are fixed here, or on a new scan.</p>
-              @if (e.blocked_by.length) {
-                <ul class="space-y-2">
-                  @for (n of e.blocked_by; track $index) {
-                    <li class="flex items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-card">
-                      <span class="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-danger-bg text-danger">
-                        <lucide-icon [img]="icons.OctagonAlert" [size]="14" aria-hidden="true" />
-                      </span>
-                      <span class="leading-relaxed">{{ n.message }}</span>
-                    </li>
-                  }
-                </ul>
-              } @else {
-                <p class="flex items-center gap-2 rounded-xl border border-ok-line bg-ok-bg px-4 py-3 text-ok">Nothing. A plan can be requested.</p>
-              }
-            }
-            @case ('published') {
-              <h2 id="detail-heading" [class]="title">Already published</h2>
-              <p [class]="subtitle">No VIP. The app's rewrite map points them at their registry URL.</p>
-              <div [class]="tableWrap">
-                <table class="w-full text-left">
-                  <thead [class]="thead">
-                    <tr><th [class]="th" class="w-[34%]">Origin</th><th class="w-8"><span class="sr-only">to</span></th><th [class]="th" class="w-[34%]">Rewritten to</th><th [class]="th">Registry note</th></tr>
-                  </thead>
-                  <tbody>
-                    @for (s of published(); track s.id) {
-                      <tr [class]="tr">
-                        <td [class]="td" class="font-mono text-[12.5px]">{{ origin(s) }}</td>
-                        <td class="text-fg-subtle"><lucide-icon [img]="icons.ArrowRight" [size]="14" aria-hidden="true" /></td>
-                        <td [class]="td" class="font-mono text-[12.5px]">
-                          @if (s.scope === 'unresolved') {
-                            <span [class]="dangerPill"><lucide-icon [img]="icons.OctagonAlert" [size]="12" aria-hidden="true" />registry entry removed</span>
-                          } @else if (s.registry_entry?.url) {
-                            {{ s.registry_entry?.url }}
-                          } @else {
-                            <span [class]="dangerPill"><lucide-icon [img]="icons.OctagonAlert" [size]="12" aria-hidden="true" />no URL</span>
+        <div class="flex min-h-0 flex-col">
+          <section class="flex-1 overflow-auto px-7 pb-12 pt-6" aria-labelledby="detail-heading">
+            @switch (view()) {
+              @case ('blocked') {
+                <h2 id="detail-heading" [class]="title">What blocks planning</h2>
+                <p [class]="subtitle">Each of these keeps a plan from being requested, as the exposure is saved. They are fixed here, or on a new scan.</p>
+                @if (e.blocked_by.length) {
+                  <ul class="space-y-2">
+                    @for (n of e.blocked_by; track $index) {
+                      <li class="rounded-xl border border-border bg-surface px-4 py-3 shadow-card">
+                        <div class="flex items-start gap-3">
+                          <span class="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-danger-bg text-danger">
+                            <lucide-icon [img]="icons.OctagonAlert" [size]="14" aria-hidden="true" />
+                          </span>
+                          <span class="flex-1 leading-relaxed">{{ n.message }}</span>
+                          @if (fixFor(e, n); as target) {
+                            @if (!isEditingUrl(target) && editable()) {
+                              <button type="button" [class]="linkButton" (click)="openUrlForm(target)">Set URL</button>
+                            }
                           }
-                        </td>
-                        <td [class]="td" class="text-[13px] text-fg-subtle">{{ s.registry_entry?.note }}</td>
-                      </tr>
-                    } @empty {
-                      <tr><td [class]="td" colspan="4" class="text-fg-subtle">None.</td></tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
-            @case ('events') {
-              <div class="flex items-center gap-3">
-                <h2 id="detail-heading" [class]="title">Event log</h2>
-                <span [class]="streamPill()">
-                  <span class="size-1.5 rounded-full bg-current" [class.animate-pulse]="stream.state() === 'live'" aria-hidden="true"></span>
-                  {{ streamLabel() }}
-                </span>
-              </div>
-              <p [class]="subtitle">Every admin action with who and when, and every step the agent reports. Newest first.</p>
-              @if (stream.events().length === 0) {
-                <p class="text-fg-subtle">{{ stream.state() === 'connecting' ? 'Loading…' : 'No events yet.' }}</p>
-              } @else {
-                <ol class="ml-2 border-l border-border">
-                  @for (ev of eventsNewestFirst(); track ev.seq) {
-                    <li class="relative mb-5 pl-6 last:mb-0">
-                      <span [class]="eventDot(ev.tone)" aria-hidden="true"></span>
-                      <div class="leading-snug">
-                        <span class="font-medium">{{ ev.actor }}</span>
-                        <span class="text-fg-muted"> · {{ ev.text }}</span>
-                        @if (ev.link; as link) {
-                          <span class="text-fg-muted"> {{ link.prefix }} </span>
-                          <a [routerLink]="['/exposures', link.exposureId]" class="font-mono text-[12.5px] text-accent hover:underline">{{ link.exposureId }}</a>
+                        </div>
+                        @if (fixFor(e, n); as target) {
+                          @if (isEditingUrl(target)) {
+                            <div class="mt-3 pl-9">
+                              <app-url-form
+                                [label]="target.kind === 'app' ? 'App URL' : 'Registry URL'"
+                                [placeholder]="target.kind === 'app' ? 'https://payroll.corp.internal' : 'https://name.example.com'"
+                                [pending]="setUrl.isPending()"
+                                [error]="urlError()"
+                                (saved)="saveUrl(target, $event)"
+                                (cancelled)="closeUrlForm()"
+                              />
+                            </div>
+                          }
                         }
-                      </div>
-                      <time class="mt-0.5 block text-xs tabular-nums text-fg-subtle" [attr.datetime]="ev.iso">{{ ev.when }}</time>
-                    </li>
-                  }
-                </ol>
-              }
-            }
-            @case ('excluded') {
-              <h2 id="detail-heading" [class]="title">Excluded</h2>
-              <p [class]="subtitle">Excluded on the scan, so out of scope.</p>
-              <div [class]="tableWrap">
-                <table class="w-full text-left">
-                  <thead [class]="thead"><tr><th [class]="th">Origin</th><th [class]="th">Auth method</th></tr></thead>
-                  <tbody>
-                    @for (s of excluded(); track s.id) {
-                      <tr [class]="tr">
-                        <td [class]="td" class="font-mono text-[12.5px] text-fg-muted">{{ origin(s) }}</td>
-                        <td [class]="td"><span [class]="authPill(s)">{{ s.auth_method }}</span></td>
-                      </tr>
-                    } @empty {
-                      <tr><td [class]="td" colspan="2" class="text-fg-subtle">None.</td></tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
-            @default {
-              <h2 id="detail-heading" [class]="title">{{ selectedGroup()?.label ?? 'VIP groups' }}</h2>
-              <p [class]="subtitle">Services in one group share a VIP: one IP, HTTPS on 443.</p>
-              @if (appBlockers().length) {
-                <div class="mb-5 flex items-start gap-3 rounded-xl border border-danger-line bg-danger-bg px-4 py-3 text-danger">
-                  <lucide-icon [img]="icons.OctagonAlert" [size]="16" class="mt-0.5 shrink-0" aria-hidden="true" />
-                  <ul>
-                    @for (n of appBlockers(); track $index) {
-                      <li>{{ n.message }}</li>
+                      </li>
                     }
                   </ul>
+                } @else {
+                  <p class="flex items-center gap-2 rounded-xl border border-ok-line bg-ok-bg px-4 py-3 text-ok">Nothing. A plan can be requested.</p>
+                }
+              }
+              @case ('published') {
+                <h2 id="detail-heading" [class]="title">Already published</h2>
+                <p [class]="subtitle">No VIP. The app's rewrite map points them at their registry URL.</p>
+                <div [class]="tableWrap">
+                  <table class="w-full text-left">
+                    <thead [class]="thead">
+                      <tr><th [class]="th" class="w-[34%]">Origin</th><th class="w-8"><span class="sr-only">to</span></th><th [class]="th" class="w-[34%]">Rewritten to</th><th [class]="th">Registry note</th></tr>
+                    </thead>
+                    <tbody>
+                      @for (s of published(); track s.id) {
+                        <tr [class]="tr">
+                          <td [class]="td" class="font-mono text-[12.5px]">{{ origin(s) }}</td>
+                          <td class="text-fg-subtle"><lucide-icon [img]="icons.ArrowRight" [size]="14" aria-hidden="true" /></td>
+                          <td [class]="td" class="font-mono text-[12.5px]">
+                            @if (s.scope === 'unresolved') {
+                              <span [class]="dangerPill"><lucide-icon [img]="icons.OctagonAlert" [size]="12" aria-hidden="true" />registry entry removed</span>
+                            } @else if (s.registry_entry?.url) {
+                              {{ s.registry_entry?.url }}
+                            } @else if (s.registry_entry && isEditingUrl({ kind: 'registry', targetId: s.registry_entry.id })) {
+                              <app-url-form
+                                label="Registry URL"
+                                placeholder="https://name.example.com"
+                                [pending]="setUrl.isPending()"
+                                [error]="urlError()"
+                                (saved)="saveUrl({ kind: 'registry', targetId: s.registry_entry.id }, $event)"
+                                (cancelled)="closeUrlForm()"
+                              />
+                            } @else {
+                              <span class="flex items-center gap-2">
+                                <span [class]="dangerPill"><lucide-icon [img]="icons.OctagonAlert" [size]="12" aria-hidden="true" />no URL</span>
+                                @if (s.registry_entry && editable()) {
+                                  <button type="button" [class]="linkButton" (click)="openUrlForm({ kind: 'registry', targetId: s.registry_entry.id })">Set URL</button>
+                                }
+                              </span>
+                            }
+                          </td>
+                          <td [class]="td" class="text-[13px] text-fg-subtle">{{ s.registry_entry?.note }}</td>
+                        </tr>
+                      } @empty {
+                        <tr><td [class]="td" colspan="4" class="text-fg-subtle">None.</td></tr>
+                      }
+                    </tbody>
+                  </table>
                 </div>
               }
-              <div class="grid auto-cols-[minmax(260px,1fr)] grid-flow-col gap-4 overflow-x-auto pb-2" [class.max-w-md]="selectedGroup()">
-                @if (!selectedGroup() && ungrouped().length) {
-                  <div class="min-h-44 rounded-xl border border-dashed border-danger bg-surface-2 p-2.5" role="group" aria-label="Not grouped">
-                    <h3 class="mx-1 mb-2.5 mt-0.5 flex items-center gap-2 text-[13px] font-semibold text-danger">
-                      <lucide-icon [img]="icons.CircleDashed" [size]="15" aria-hidden="true" />Not grouped
-                      <span [class]="count(true)">{{ ungrouped().length }}</span>
-                    </h3>
-                    @for (s of ungrouped(); track s.id) {
-                      <ng-container *ngTemplateOutlet="card; context: { $implicit: s }" />
+              @case ('excluded') {
+                <h2 id="detail-heading" [class]="title">Excluded</h2>
+                <p [class]="subtitle">Excluded on the scan, so out of scope.</p>
+                <div [class]="tableWrap">
+                  <table class="w-full text-left">
+                    <thead [class]="thead"><tr><th [class]="th">Origin</th><th [class]="th">Auth method</th></tr></thead>
+                    <tbody>
+                      @for (s of excluded(); track s.id) {
+                        <tr [class]="tr">
+                          <td [class]="td" class="font-mono text-[12.5px] text-fg-muted">{{ origin(s) }}</td>
+                          <td [class]="td"><span class="rounded-full border border-border px-1.5 py-px text-[11px] font-medium text-fg-muted">{{ s.auth_method }}</span></td>
+                        </tr>
+                      } @empty {
+                        <tr><td [class]="td" colspan="2" class="text-fg-subtle">None.</td></tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+              @case ('events') {
+                <div class="flex items-center gap-3">
+                  <h2 id="detail-heading" [class]="title">Event log</h2>
+                  <span [class]="streamPill()">
+                    <span class="size-1.5 rounded-full bg-current" [class.animate-pulse]="stream.state() === 'live'" aria-hidden="true"></span>
+                    {{ streamLabel() }}
+                  </span>
+                </div>
+                <p [class]="subtitle">Every admin action with who and when, and every step the agent reports. Newest first.</p>
+                @if (stream.events().length === 0) {
+                  <p class="text-fg-subtle">{{ stream.state() === 'connecting' ? 'Loading…' : 'No events yet.' }}</p>
+                } @else {
+                  <ol class="ml-2 border-l border-border">
+                    @for (ev of eventsNewestFirst(); track ev.seq) {
+                      <li class="relative mb-5 pl-6 last:mb-0">
+                        <span [class]="eventDot(ev.tone)" aria-hidden="true"></span>
+                        <div class="leading-snug">
+                          <span class="font-medium">{{ ev.actor }}</span>
+                          <span class="text-fg-muted"> · {{ ev.text }}</span>
+                          @if (ev.link; as link) {
+                            <span class="text-fg-muted"> {{ link.prefix }} </span>
+                            <a [routerLink]="['/exposures', link.exposureId]" class="font-mono text-[12.5px] text-accent hover:underline">{{ link.exposureId }}</a>
+                          }
+                        </div>
+                        <time class="mt-0.5 block text-xs tabular-nums text-fg-subtle" [attr.datetime]="ev.iso">{{ ev.when }}</time>
+                      </li>
+                    }
+                  </ol>
+                }
+              }
+              @default {
+                <h2 id="detail-heading" [class]="title">{{ selectedGroup()?.label ?? 'VIP groups' }}</h2>
+                <p [class]="subtitle">
+                  Services in one group share a VIP: one IP, HTTPS on 443.
+                  @if (editable()) {
+                    Drag a card, or focus it and press 1–9 for a VIP, N for a new one, 0 to take it out.
+                  }
+                </p>
+
+                @if (conflict()) {
+                  <div class="mb-4 flex items-start gap-3 rounded-xl border border-warn-line bg-warn-bg px-4 py-3 text-warn" role="alert">
+                    <lucide-icon [img]="icons.RefreshCw" [size]="16" class="mt-0.5 shrink-0" aria-hidden="true" />
+                    <div class="flex-1">
+                      <p class="font-medium">{{ conflictBy() ?? 'Someone' }} changed this exposure while you were editing (now version {{ e.version }}).</p>
+                      <p class="text-[13px]">Your changes are based on version {{ draft()?.baseVersion }} and can no longer be saved. Reload to see theirs; yours will be discarded.</p>
+                    </div>
+                    <button type="button" class="rounded-md border border-warn-line bg-surface px-3 py-1.5 text-[13px] font-medium text-fg hover:bg-surface-2" (click)="discard()">Reload</button>
+                  </div>
+                }
+                @if (editable() && e.status !== 'grouping') {
+                  <div class="mb-4 flex items-start gap-3 rounded-xl border border-accent-line bg-accent-bg px-4 py-3 text-[13px]">
+                    <lucide-icon [img]="icons.Info" [size]="16" class="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+                    Saving a change moves this exposure back to grouping and drops its plan.
+                  </div>
+                }
+                @if (appBlockers().length) {
+                  <div class="mb-5 flex items-start gap-3 rounded-xl border border-danger-line bg-danger-bg px-4 py-3 text-danger">
+                    <lucide-icon [img]="icons.OctagonAlert" [size]="16" class="mt-0.5 shrink-0" aria-hidden="true" />
+                    <ul class="flex-1">
+                      @for (n of appBlockers(); track $index) {
+                        <li>{{ n.message }}</li>
+                      }
+                    </ul>
+                    @if (editable()) {
+                      <button type="button" [class]="linkButton" (click)="openUrlForm({ kind: 'app', targetId: e.app.id })">Set URL</button>
                     }
                   </div>
                 }
-                @for (g of shownGroups(); track g.id) {
-                  <div class="min-h-44 rounded-xl border border-border bg-surface-2 p-2.5" role="group" [attr.aria-label]="g.label">
-                    <h3 class="mx-1 mb-2.5 mt-0.5 flex items-center gap-2 text-[13px] font-semibold">
-                      <span [class]="vipBadge(g.blocked)" aria-hidden="true">{{ g.number }}</span>
-                      <span class="flex-1 truncate">VIP {{ g.number }}<span class="font-normal text-fg-muted"> · {{ g.hosts }}</span></span>
-                      <span [class]="count(false)">{{ g.services.length }}</span>
-                    </h3>
-                    @for (s of g.services; track s.id) {
-                      <ng-container *ngTemplateOutlet="card; context: { $implicit: s }" />
-                    } @empty {
-                      <p class="grid h-24 place-items-center rounded-lg border border-dashed border-border text-[13px] text-fg-subtle">No services</p>
-                    }
-                  </div>
+
+                @if (draft(); as d) {
+                  <app-grouping-board
+                    [exposure]="e"
+                    [draft]="d"
+                    [editable]="editable()"
+                    [only]="selectedGroup()?.key ?? null"
+                    [errors]="saveErrors()"
+                    (moved)="move($event)"
+                    (added)="addEmptyGroup()"
+                    (removed)="removeEmptyGroup($event)"
+                  />
+                }
+              }
+            }
+          </section>
+
+          @if (dirty() || saveMessage()) {
+            <div class="flex items-center gap-3 border-t border-border bg-surface px-7 py-3 shadow-raised" role="region" aria-label="Unsaved changes">
+              <span class="size-2 rounded-full bg-warn" aria-hidden="true"></span>
+              <div class="flex-1 text-[13px]">
+                @if (saveMessage(); as message) {
+                  <span class="text-danger" role="alert">{{ message }}</span>
+                } @else if (blockedSave(); as reason) {
+                  <span class="text-fg-muted">{{ reason }}</span>
+                } @else {
+                  <span class="font-medium">Unsaved changes to the grouping</span>
                 }
               </div>
-            }
+              <button type="button" class="rounded-md px-3 py-1.5 text-[13px] font-medium text-fg-muted hover:bg-border-soft hover:text-fg" (click)="discard()">Discard</button>
+              <button
+                type="button"
+                class="rounded-md bg-ok px-3.5 py-1.5 text-[13px] font-medium text-white shadow-card transition-opacity disabled:opacity-50"
+                [disabled]="!!blockedSave() || conflict() || save.isPending() || !dirty()"
+                (click)="saveGrouping()"
+              >
+                {{ save.isPending() ? 'Saving…' : 'Save grouping' }}
+              </button>
+            </div>
           }
-        </section>
+        </div>
       </div>
-
-      <ng-template #card let-s>
-        <article
-          class="mb-2 rounded-lg border border-border bg-surface px-3 py-2.5 shadow-card transition-shadow last:mb-0 hover:shadow-raised"
-          [attr.aria-label]="origin(s)"
-        >
-          <div class="break-all font-mono text-[12.5px] font-medium">{{ origin(s) }}</div>
-          <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-            <span [class]="authPill(s)"><lucide-icon [img]="icons.KeyRound" [size]="11" aria-hidden="true" />{{ s.auth_method }}</span>
-            <span class="inline-flex items-center gap-1 text-fg-muted" [title]="s.ips?.join(', ') ?? ''">
-              <lucide-icon [img]="icons.Server" [size]="12" aria-hidden="true" />{{ members(s) }}
-            </span>
-            <span class="ml-auto flex gap-1">
-              @for (scanner of s.found_by; track scanner) {
-                <span class="rounded border border-border px-1 text-[11px] text-fg-subtle">{{ scanner }}</span>
-              }
-            </span>
-          </div>
-          @for (n of blockersOf(e, s); track $index) {
-            <p class="mt-2 flex gap-1.5 rounded-md border-l-2 border-danger bg-danger-bg px-2 py-1.5 text-xs leading-relaxed text-danger">
-              <lucide-icon [img]="icons.OctagonAlert" [size]="13" class="mt-px shrink-0" aria-hidden="true" />{{ n.message }}
-            </p>
-          }
-          @for (n of s.warnings; track $index) {
-            <p class="mt-2 flex gap-1.5 rounded-md border-l-2 border-warn bg-warn-bg px-2 py-1.5 text-xs leading-relaxed text-warn">
-              <lucide-icon [img]="icons.TriangleAlert" [size]="13" class="mt-px shrink-0" aria-hidden="true" />{{ n.message }}
-            </p>
-          }
-        </article>
-      </ng-template>
     }
   `
 })
@@ -330,6 +388,150 @@ export class WorkspaceComponent {
   protected readonly exposure = computed(() => this.query.data());
   protected readonly view = signal<View>('board');
   protected readonly stream = injectExposureEvents(this.id);
+  protected readonly save = useSaveGroupsMutation(this.id);
+  protected readonly setUrl = useSetUrlMutation(this.id);
+
+  // ---- The grouping draft ----------------------------------------------------
+
+  /** The grouping being edited; replaced by the saved one whenever there is nothing unsaved. */
+  protected readonly draft = signal<GroupingDraft | null>(null);
+  /** The saved exposure the draft was made from. */
+  private readonly baseline = signal<ExposureDetail | null>(null);
+  protected readonly saveErrors = signal<Record<string, string[]>>({});
+  protected readonly saveMessage = signal<string | null>(null);
+
+  protected readonly editable = computed(() => {
+    const e = this.exposure();
+    return !!e && EDITABLE.includes(e.status);
+  });
+  protected readonly dirty = computed(() => {
+    const d = this.draft();
+    const base = this.baseline();
+    return !!d && !!base && isDirty(d, base);
+  });
+  /** Someone else saved since this draft was made: it would be refused. */
+  protected readonly conflict = computed(() => {
+    const e = this.exposure();
+    const d = this.draft();
+    return this.dirty() && !!e && !!d && e.version !== d.baseVersion;
+  });
+  /** Who made the change behind a conflict, from the event log. */
+  protected readonly conflictBy = computed(() => {
+    const base = this.draft()?.baseVersion ?? 0;
+    const later = this.stream.events().filter((ev) => ev.type === 'grouping_saved' && Number(ev.payload['version']) > base);
+    return later.length ? later[later.length - 1].actor : null;
+  });
+  protected readonly blockedSave = computed(() => {
+    const d = this.draft();
+    return d ? saveBlocker(d) : null;
+  });
+
+  constructor() {
+    // Follow the saved exposure, unless the admin has unsaved changes: those
+    // stay, and a newer version shows as a conflict instead.
+    effect(() => {
+      const e = this.exposure();
+      if (!e) return;
+      const base = untracked(this.baseline);
+      if (!base || base.id !== e.id || !untracked(this.dirty)) this.reset(e);
+    });
+  }
+
+  private reset(e: ExposureDetail): void {
+    this.draft.set(draftFrom(e));
+    this.baseline.set(e);
+    this.saveErrors.set({});
+    this.saveMessage.set(null);
+  }
+
+  protected move(request: MoveRequest): void {
+    const d = this.draft();
+    if (!d || !this.editable()) return;
+    this.saveMessage.set(null);
+    this.draft.set(request.to === 'new' ? moveToNewGroup(d, request.serviceId) : moveService(d, request.serviceId, request.to, request.index));
+  }
+
+  protected addEmptyGroup(): void {
+    const d = this.draft();
+    if (d) this.draft.set(addGroup(d).draft);
+  }
+
+  protected removeEmptyGroup(key: string): void {
+    const d = this.draft();
+    if (!d) return;
+    this.draft.set(removeGroup(d, key));
+    if (this.view() === this.groupView(key)) this.view.set('board');
+  }
+
+  protected discard(): void {
+    const e = this.exposure();
+    if (e) this.reset(e);
+  }
+
+  protected saveGrouping(): void {
+    const d = this.draft();
+    if (!d) return;
+    this.saveMessage.set(null);
+    this.save.mutate(toRequest(d), {
+      onSuccess: (saved) => this.reset(saved),
+      onError: (err) => {
+        const error = apiError(err);
+        if (error.httpStatus === 409) {
+          this.saveMessage.set(`Not saved: ${error.message}. Reload to see the exposure as it is now.`);
+        } else if (error.errors?.length) {
+          const byService: Record<string, string[]> = {};
+          for (const n of error.errors) if (n.service_id) (byService[n.service_id] ??= []).push(n.message);
+          this.saveErrors.set(byService);
+          this.saveMessage.set(`Not saved: ${error.message}. The cards in red say why.`);
+        } else {
+          this.saveMessage.set(`Not saved: ${error.message}.`);
+        }
+      }
+    });
+  }
+
+  // ---- Fixing blockers: the app's URL, a registry entry's URL ----------------
+
+  protected readonly editingUrl = signal<string | null>(null);
+  protected readonly urlError = signal<string | null>(null);
+
+  protected isEditingUrl(target: UrlTarget): boolean {
+    return this.editingUrl() === `${target.kind}:${target.targetId}`;
+  }
+
+  protected openUrlForm(target: UrlTarget): void {
+    this.urlError.set(null);
+    this.editingUrl.set(`${target.kind}:${target.targetId}`);
+    if (target.kind === 'app' && this.view() !== 'blocked') this.view.set('blocked');
+  }
+
+  protected closeUrlForm(): void {
+    this.editingUrl.set(null);
+    this.urlError.set(null);
+  }
+
+  protected saveUrl(target: UrlTarget, url: string): void {
+    this.urlError.set(null);
+    this.setUrl.mutate(
+      { ...target, url },
+      {
+        onSuccess: () => this.closeUrlForm(),
+        onError: (err) => this.urlError.set(apiError(err).message)
+      }
+    );
+  }
+
+  /** The URL that fixes a blocker, when one does. */
+  protected fixFor(e: ExposureDetail, n: ExposureNotice): UrlTarget | null {
+    if (n.code === 'app_url_missing') return { kind: 'app', targetId: e.app.id };
+    if (n.code === 'published_url_missing') {
+      const entry = e.services.find((s) => s.id === n.service_id)?.registry_entry;
+      return entry ? { kind: 'registry', targetId: entry.id } : null;
+    }
+    return null;
+  }
+
+  // ---- What the panes show ---------------------------------------------------
 
   protected readonly eventsNewestFirst = computed(() =>
     [...this.stream.events()].reverse().map((event) => ({
@@ -354,66 +556,40 @@ export class WorkspaceComponent {
       }[this.stream.state()]
   );
 
-  protected eventDot(tone: EventTone): string {
-    return (
-      'absolute -left-[5px] top-1.5 size-2.5 rounded-full ring-4 ring-bg ' +
-      { neutral: 'bg-fg-subtle', accent: 'bg-accent', ok: 'bg-ok', danger: 'bg-danger', muted: 'bg-border' }[tone]
-    );
-  }
-
-  protected readonly icons = {
-    ArrowLeft,
-    ArrowRight,
-    CircleDashed,
-    Clock,
-    EyeOff,
-    GitCompareArrows,
-    Globe,
-    KeyRound,
-    LayoutGrid,
-    OctagonAlert,
-    Radar,
-    Server,
-    ScrollText,
-    Share2,
-    TriangleAlert,
-    User
-  };
-
   private readonly blockedServices = computed(
-    () => new Set((this.exposure()?.blocked_by ?? []).map((n) => n.service_id).filter((id) => id !== null))
+    () =>
+      new Set(
+        (this.exposure()?.blocked_by ?? [])
+          .filter((n) => n.code !== 'service_ungrouped')
+          .map((n) => n.service_id)
+          .filter((id) => id !== null)
+      )
   );
 
-  protected readonly groups = computed<GroupView[]>(() => {
+  /** The draft's groups, as the left pane lists them. */
+  protected readonly sideGroups = computed(() => {
     const e = this.exposure();
-    if (!e) return [];
+    const d = this.draft();
+    if (!e || !d) return [];
     const byId = new Map(e.services.map((s) => [s.id, s]));
-    return e.groups.map((g, i) => {
-      const services = g.service_ids.map((id) => byId.get(id)).filter((s): s is ExposureService => !!s);
-      const hosts = [...new Set(services.map((s) => s.host.split('.')[0]))].join(', ');
+    return d.groups.map((g, i) => {
+      const hosts = [...new Set(g.serviceIds.map((id) => byId.get(id)?.host.split('.')[0]).filter(Boolean))].join(', ');
       return {
-        id: g.id,
+        key: g.key,
         number: i + 1,
-        label: hosts ? `VIP ${i + 1} · ${hosts}` : `VIP ${i + 1}`,
         hosts,
-        services,
-        blocked: services.some((s) => this.blockedServices().has(s.id))
+        label: hosts ? `VIP ${i + 1} · ${hosts}` : `VIP ${i + 1}`,
+        count: g.serviceIds.length,
+        blocked: g.serviceIds.some((id) => this.blockedServices().has(id) || !!this.saveErrors()[id])
       };
     });
   });
 
   protected readonly selectedGroup = computed(() => {
     const view = this.view();
-    return view.startsWith('group:') ? this.groups().find((g) => `group:${g.id}` === view) : undefined;
-  });
-  protected readonly shownGroups = computed(() => {
-    const selected = this.selectedGroup();
-    return selected ? [selected] : this.groups();
+    return view.startsWith('group:') ? this.sideGroups().find((g) => `group:${g.key}` === view) : undefined;
   });
 
-  protected readonly ungrouped = computed(
-    () => this.exposure()?.services.filter((s) => s.scope === 'needs_vip' && !s.group_id) ?? []
-  );
   protected readonly published = computed(
     () => this.exposure()?.services.filter((s) => s.scope === 'published' || s.scope === 'unresolved') ?? []
   );
@@ -422,13 +598,10 @@ export class WorkspaceComponent {
   /** Blockers about the whole exposure, which no card shows. */
   protected readonly appBlockers = computed(() => this.exposure()?.blocked_by.filter((n) => !n.service_id) ?? []);
 
-  protected readonly origin = formatOrigin;
-
   /** The header's facts, each with its icon; the label is for screen readers. */
   protected readonly meta = computed(() => {
     const e = this.exposure();
     if (!e) return [];
-    const date = formatDate(e.submitted_at, 'MMM d, y · HH:mm', 'en-US');
     const items: {
       label: string;
       icon: typeof Globe;
@@ -442,24 +615,29 @@ export class WorkspaceComponent {
       { label: 'App URL', icon: Globe, text: e.app.url ?? 'no URL', mono: true, danger: !e.app.url },
       { label: 'Scan', icon: Radar, text: e.scan_id.slice(0, 8), mono: true, title: e.scan_id },
       { label: 'Submitted by', icon: User, text: e.submitted_by },
-      { label: 'Submitted', icon: Clock, text: date }
+      { label: 'Submitted', icon: Clock, text: formatDate(e.submitted_at, 'MMM d, y · HH:mm', 'en-US') }
     ];
     if (e.supersedes) items.push({ label: 'Replaces', icon: GitCompareArrows, prefix: 'replaces', link: e.supersedes });
     if (e.superseded_by) items.push({ label: 'Replaced by', icon: GitCompareArrows, prefix: 'replaced by', link: e.superseded_by });
     return items;
   });
 
-  protected groupView(id: string): View {
-    return `group:${id}`;
-  }
+  protected readonly origin = formatOrigin;
+  protected readonly icons = {
+    ArrowLeft,
+    ArrowRight,
+    CircleDashed,
+    EyeOff,
+    Info,
+    LayoutGrid,
+    OctagonAlert,
+    RefreshCw,
+    ScrollText,
+    Share2
+  };
 
-  protected members(s: ExposureService): string {
-    const n = s.ips?.length ?? 0;
-    return n === 0 ? 'unresolved' : `${n} member${n === 1 ? '' : 's'}`;
-  }
-
-  protected blockersOf(e: ExposureDetail, s: ExposureService): ExposureNotice[] {
-    return e.blocked_by.filter((n) => n.service_id === s.id);
+  protected groupView(key: string): View {
+    return `group:${key}`;
   }
 
   // Shared classes, so the template reads as structure.
@@ -471,6 +649,8 @@ export class WorkspaceComponent {
   protected readonly th = 'px-4 py-2.5 font-medium';
   protected readonly tr = 'border-t border-border-soft transition-colors first:border-t-0 hover:bg-surface-2';
   protected readonly td = 'px-4 py-2.5 align-middle';
+  protected readonly linkButton =
+    'shrink-0 rounded-md border border-border bg-surface px-2.5 py-1 font-sans text-xs font-medium text-accent hover:bg-surface-2';
   protected readonly dangerPill =
     'inline-flex items-center gap-1 rounded-full border border-danger-line bg-danger-bg px-2 py-0.5 font-sans text-xs font-medium text-danger';
 
@@ -489,7 +669,6 @@ export class WorkspaceComponent {
     );
   }
 
-  /** A group's number, ringed in red when something in it blocks planning. */
   protected vipBadge(blocked: boolean): string {
     return (
       'grid size-5 shrink-0 place-items-center rounded-md text-[11px] font-semibold tabular-nums ring-1 ring-inset ' +
@@ -497,13 +676,10 @@ export class WorkspaceComponent {
     );
   }
 
-  /** Kerberos is flagged: v1 cannot publish it. */
-  protected authPill(s: ExposureService): string {
+  protected eventDot(tone: EventTone): string {
     return (
-      'inline-flex items-center gap-1 rounded-full border px-1.5 py-px font-sans text-[11px] font-medium ' +
-      (s.auth_method === 'kerberos' && s.scope === 'needs_vip'
-        ? 'border-danger-line bg-danger-bg text-danger'
-        : 'border-accent-line bg-accent-bg text-accent')
+      'absolute -left-[5px] top-1.5 size-2.5 rounded-full ring-4 ring-bg ' +
+      { neutral: 'bg-fg-subtle', accent: 'bg-accent', ok: 'bg-ok', danger: 'bg-danger', muted: 'bg-border' }[tone]
     );
   }
 }

@@ -60,7 +60,15 @@ Decided, from prototype C:
 
 To decide:
 
-- How the workspace shows that another admin saved the grouping while this one has unsaved changes.
+- Whether the board needs a bulk move (select several cards, move them at once) for exposures with many services.
+
+Decided while building phase 3:
+
+- The grouping is a draft until saved. A bar at the foot of the board says there are unsaved changes, with Discard and Save grouping; Save is disabled, with the reason, while a service is in no group.
+- When another admin saves while this one has unsaved changes, the board keeps them and shows a banner naming who saved and the new version, with Reload, which discards them; Save is disabled meanwhile.
+- In `planning` and `awaiting_confirmation` the board is editable, under a note that saving drops the plan; past that it is read-only.
+- A refused save says why in the bar; a refusal per service marks the cards it names in red.
+- The app's URL and a registry entry's URL are set inline, where the blocker is listed, with the server's error under the field.
 
 ## Progress and failure
 

@@ -6,7 +6,7 @@ Built with Angular 21, Tailwind, TanStack Query and MSW, like the scanner fronte
 
 ## Status
 
-Phase 2, read-only: the queue, the history and an exposure's workspace with its live event log, against mocked data or the real backend. The look follows prototype C (`docs/exposure-console-ui.md`): a master-and-detail workspace, light and dark themes. The grouping can't be edited yet, and there's no sign-in.
+Phases 2 and 3: the queue, the history and an exposure's workspace with its live event log; the grouping edited by drag and drop or the keyboard and saved; the app's and registry entries' URLs set where they block planning. Against mocked data or the real backend. The look follows prototype C (`docs/exposure-console-ui.md`): a master-and-detail workspace, light and dark themes. There's no sign-in yet.
 
 ## Run
 

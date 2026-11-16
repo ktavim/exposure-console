@@ -192,6 +192,13 @@ export const EXPOSURES: ExposureDetail[] = [
   )
 ];
 
+/** Recompute what the backend derives, after a mock write changed an exposure. */
+export function refresh(e: ExposureDetail): void {
+  e.blocked_by = blockers(e.app.url, e.services);
+  e.blocked = e.blocked_by.length > 0;
+  e.needs_vip_count = e.services.filter((s) => s.scope === 'needs_vip').length;
+}
+
 export function toSummary(e: ExposureDetail): ExposureSummary {
   const { id, status, version, app, scan_id, submitted_at, submitted_by, created_at, needs_vip_count, blocked } = e;
   return { id, status, version, app, scan_id, submitted_at, submitted_by, created_at, needs_vip_count, blocked };
