@@ -164,7 +164,10 @@ export function deploymentFrom(plan: Plan): Deployment {
     public_url: plan.app.public_url,
     virtual_servers: [...plan.vips.map((v) => `/${plan.partition}/app/vs_${v.group_id}`), `/${plan.partition}/app/vs_app`],
     dns_records: plan.dns_records.map((r, i) => ({ ...r, id: `rec_${(i + 1).toString().padStart(4, '0')}` })),
-    registered: plan.vips.flatMap((v) => v.services.map((s) => ({ origin: s.original, url: s.url }))),
+    registered: [
+      ...plan.vips.flatMap((v) => v.services.map((s) => ({ origin: s.original, url: s.url }))),
+      { origin: new URL(plan.app.url).origin, url: plan.app.public_url }
+    ],
     already_registered: []
   };
 }
