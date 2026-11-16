@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Console prototypes</title>
+<style>
+  body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; color: #1f2328; }
+  a { color: #0969da; } li { margin-bottom: 12px; } code { font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Exposure console prototypes</h1>
+<p>Three throwaway directions, each with the grouping workspace and the plan review, built from the same data (<code>data.js</code>). Switch between the two screens with the prototype toggle in each page's top bar. Compare them against the criteria in <code>docs/exposure-console-ui.md</code>, not only on looks.</p>
+<ol>
+  <li><a href="a-dense.html">A · Dense tables</a>: light and compact. Grouping is one table with a VIP picker per row. The plan review has tabs, a unified diff, and a sticky confirm bar with the warnings and an acknowledgement checkbox, then a danger dialog.</li>
+  <li><a href="b-run.html">B · Run page</a>: dark, roomy, with a step timeline. Grouping uses a card per VIP, with drag and drop or a Move menu. The plan review has summary cards, a split diff, and a deploy bar where you type the app's name to confirm.</li>
+  <li><a href="c-split.html">C · Master and detail</a>: light or dark. The left pane lists VIPs and sections; the right pane shows the selected one. Grouping is columns with drag and drop and keyboard moves (focus a card, press 1–9, N or 0). The plan review is laid out like a pull request's changed files, with a drawer where you acknowledge each warning before deploying.</li>
+</ol>
+</body>
+</html>

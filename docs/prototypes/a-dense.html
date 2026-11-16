@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A · Dense tables</title>
+<style>
+  :root {
+    --bg: #f4f4f4; --surface: #fff; --surface-2: #f4f4f4; --line: #e0e0e0; --line-strong: #c6c6c6;
+    --fg: #161616; --muted: #525252; --subtle: #6f6f6f; --accent: #0f62fe; --accent-hover: #0353e9;
+    --danger: #da1e28; --danger-bg: #fff1f1; --warn: #8e6a00; --warn-bg: #fcf4d6; --ok: #198038;
+    --add: #defbe6; --add-fg: #0e6027; --del: #fff1f1; --del-fg: #a2191f;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .muted { color: var(--muted); } .subtle { color: var(--subtle); }
+  header.top { height: 40px; background: #161616; color: #f4f4f4; display: flex; align-items: center; padding: 0 16px; gap: 24px; }
+  header.top b { font-weight: 600; }
+  header.top a { color: #c6c6c6; text-decoration: none; } header.top a.on { color: #fff; box-shadow: inset 0 -2px #0f62fe; padding: 11px 0; }
+  .proto { margin-left: auto; display: flex; gap: 4px; font-size: 12px; }
+  .proto button { background: #393939; color: #f4f4f4; border: 0; padding: 4px 8px; cursor: pointer; }
+  .proto button[aria-pressed="true"] { background: #0f62fe; }
+  main { max-width: 1280px; margin: 0 auto; padding: 16px; }
+  .crumbs { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .crumbs a { color: var(--accent); text-decoration: none; }
+  h1 { font-size: 20px; font-weight: 400; margin: 0; display: flex; align-items: center; gap: 10px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 6px 0 16px; color: var(--muted); font-size: 12px; }
+  .meta b { color: var(--fg); font-weight: 500; }
+  .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 1px 8px; border-radius: 12px; white-space: nowrap; }
+  .tag.neutral { background: #e0e0e0; } .tag.attention { background: #fcf4d6; color: #684e00; }
+  .tag.small { font-size: 11px; padding: 0 6px; }
+  .tag.auth { background: #edf5ff; color: #0043ce; } .tag.warn { background: var(--warn-bg); color: #684e00; } .tag.err { background: var(--danger-bg); color: var(--del-fg); }
+  .notice { border-left: 3px solid var(--danger); background: var(--danger-bg); padding: 8px 12px; margin-bottom: 16px; }
+  .notice h2 { font-size: 13px; margin: 0 0 4px; }
+  .notice ul { margin: 0; padding-left: 18px; } .notice a { color: var(--fg); }
+  .toolbar { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+  .toolbar h2 { font-size: 14px; font-weight: 600; margin: 0; }
+  .toolbar .grow { flex: 1; }
+  button.btn { font: inherit; border: 0; padding: 6px 12px; cursor: pointer; background: var(--accent); color: #fff; }
+  button.btn:hover { background: var(--accent-hover); }
+  button.btn.ghost { background: transparent; color: var(--accent); }
+  button.btn.ghost:hover { background: #e5e5e5; }
+  button.btn.secondary { background: #393939; } button.btn.danger { background: var(--danger); }
+  button.btn:disabled { background: #c6c6c6; color: #8d8d8d; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); }
+  table.plan { table-layout: fixed; }
+  th { text-align: left; font-weight: 600; font-size: 12px; background: #e0e0e0; padding: 6px 8px; }
+  td { padding: 5px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+  tr.group td { background: var(--surface-2); font-weight: 600; border-top: 1px solid var(--line-strong); }
+  tr.group td .subtle { font-weight: 400; }
+  tr.blocked td:first-child { box-shadow: inset 3px 0 var(--danger); }
+  tr:hover td { background: #e8e8e8; } tr.group:hover td { background: var(--surface-2); }
+  select { font: inherit; font-size: 12px; padding: 2px 4px; border: 0; border-bottom: 1px solid #8d8d8d; background: #f4f4f4; }
+  details { margin-top: 16px; } summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 4px 0; }
+  .note { font-size: 12px; margin-top: 2px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; } .note.err { color: var(--danger); } .note.warn { color: var(--warn); }
+  .tabs { display: flex; border-bottom: 1px solid var(--line-strong); margin-bottom: 12px; }
+  .tabs button { font: inherit; background: none; border: 0; padding: 8px 16px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs button[aria-selected="true"] { color: var(--fg); border-color: var(--accent); font-weight: 600; }
+  .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; background: var(--line); margin-bottom: 16px; border: 1px solid var(--line); }
+  .stats div { background: var(--surface); padding: 8px 12px; } .stats b { display: block; font-size: 20px; font-weight: 400; }
+  .stats .add b { color: var(--add-fg); } .stats .chg b { color: var(--warn); }
+  pre.diff { margin: 0; background: var(--surface); border: 1px solid var(--line); overflow: auto; font-family: var(--mono); font-size: 12px; }
+  pre.diff span { display: block; padding: 0 8px; white-space: pre; }
+  pre.diff .ln { display: inline-block; width: 32px; color: var(--subtle); user-select: none; }
+  pre.diff .add { background: var(--add); } pre.diff .del { background: var(--del); }
+  pre.json { background: var(--surface); border: 1px solid var(--line); padding: 8px; overflow: auto; font-family: var(--mono); font-size: 12px; margin: 0; max-height: 480px; }
+  .confirmbar { position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--line-strong); margin: 16px -16px -16px; padding: 12px 16px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: end; }
+  .confirmbar ul { margin: 4px 0 0; padding-left: 18px; color: #684e00; }
+  .confirmbar label { display: block; margin-top: 8px; }
+  dialog { border: 0; padding: 0; width: 560px; box-shadow: 0 4px 24px rgba(0,0,0,.3); }
+  dialog::backdrop { background: rgba(22,22,22,.5); }
+  dialog .hd { padding: 16px; } dialog .hd small { color: var(--muted); } dialog .hd h3 { margin: 4px 0 0; font-weight: 400; font-size: 20px; }
+  dialog .bd { padding: 0 16px 16px; } dialog .ft { display: grid; grid-template-columns: 1fr 1fr; }
+  dialog .ft button { padding: 16px; text-align: left; }
+  .events td { font-size: 12px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <b>Exposure Console</b>
+  <a href="#" class="on">Queue</a><a href="#">History</a>
+  <div class="proto" role="group" aria-label="Prototype state">
+    <span style="padding:4px 4px;color:#a8a8a8">Prototype:</span>
+    <button id="s-grouping" aria-pressed="true">Grouping</button>
+    <button id="s-plan" aria-pressed="false">Plan review</button>
+  </div>
+</header>
+<main id="root"></main>
+
+<dialog id="confirm">
+  <div class="hd"><small>Payroll v3 · version 7</small><h3>Deploy this plan to the F5?</h3></div>
+  <div class="bd" id="confirm-body"></div>
+  <div class="ft">
+    <button class="btn secondary" id="confirm-cancel">Cancel</button>
+    <button class="btn danger" id="confirm-go">Deploy</button>
+  </div>
+</dialog>
+
+<script src="data.js"></script>
+<script>
+const P = window.PROTO, G = P.grouping, PL = P.plan;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let state = 'grouping', tab = 'overview';
+// Editable copy of the grouping: service key -> group id or null.
+const groupOf = {};
+for (const g of G.groups) for (const s of g.services) groupOf[s] = g.id;
+let groupIds = G.groups.map((g) => g.id), dirty = false;
+
+function header(status, tagClass, version) {
+  return `<div class="crumbs"><a href="#">Queue</a> / ${esc(G.id)}</div>
+    <h1>${esc(P.app.name)} <span class="tag ${tagClass}">${status}</span></h1>
+    <div class="meta"><span>App URL <b class="mono">${esc(P.app.url)}</b></span><span>Scan <b class="mono">${G.scan_id.slice(0, 8)}</b></span>
+    <span>Submitted <b>${G.submitted_at}</b> by <b>${G.submitted_by}</b></span><span>Replaces <a href="#" class="mono">${G.supersedes}</a></span><span>Version <b>${version}</b></span></div>`;
+}
+
+function blockers() {
+  const out = [...G.blocked_by];
+  return out.filter((b) => !(b.service === 'search' && groupOf.search));
+}
+
+function renderGrouping() {
+  const S = G.services, need = Object.keys(S).filter((k) => S[k].scope === 'needs_vip');
+  const bl = blockers();
+  const blockOf = (k) => bl.filter((b) => b.service === k);
+  const row = (k) => {
+    const s = S[k], b = blockOf(k), w = G.warnings[k] || [];
+    const opts = [`<option value="">Not grouped</option>`, ...groupIds.map((g, i) => `<option value="${g}" ${groupOf[k] === g ? 'selected' : ''}>VIP ${i + 1}</option>`), `<option value="__new">New VIP…</option>`].join('');
+    return `<tr class="${b.length ? 'blocked' : ''}" id="row-${k}">
+      <td class="mono">${esc(s.origin)}${b.map((x) => `<div class="note err">${esc(x.message)}</div>`).join('')}${w.map((x) => `<div class="note warn">${esc(x)}</div>`).join('')}</td>
+      <td><span class="tag auth small">${s.auth}</span></td>
+      <td class="mono subtle">${s.ips.join(', ')}</td>
+      <td class="subtle">${s.found_by.join(', ')}</td>
+      <td><select data-svc="${k}" aria-label="VIP for ${esc(s.origin)}">${opts}</select></td></tr>`;
+  };
+  let body = '';
+  groupIds.forEach((g, i) => {
+    const members = need.filter((k) => groupOf[k] === g);
+    body += `<tr class="group"><td colspan="5">VIP ${i + 1} <span class="subtle">· ${members.length} service${members.length === 1 ? '' : 's'} · one IP, HTTPS on 443</span>${members.length ? '' : ' <span class="subtle">· empty, removed on save</span>'}</td></tr>`;
+    body += members.map(row).join('');
+  });
+  const loose = need.filter((k) => !groupOf[k]);
+  if (loose.length) body += `<tr class="group"><td colspan="5" style="color:var(--danger)">Not grouped · ${loose.length}</td></tr>` + loose.map(row).join('');
+
+  const pub = Object.keys(S).filter((k) => S[k].scope === 'published');
+  const exc = Object.keys(S).filter((k) => S[k].scope === 'excluded');
+  $('#root').innerHTML = header('Grouping', 'neutral', G.version) + `
+    ${bl.length ? `<div class="notice" role="region" aria-label="Planning is blocked"><h2>Planning is blocked (${bl.length})</h2><ul>${bl.map((b) => `<li><a href="#row-${b.service}">${esc(b.message)}</a></li>`).join('')}</ul></div>` : ''}
+    <div class="toolbar"><h2>Services that need a VIP</h2><span class="subtle">${need.length}</span><span class="grow"></span>
+      ${dirty ? '<span class="subtle">Unsaved changes</span><button class="btn ghost" id="discard">Discard</button><button class="btn secondary" id="save">Save grouping</button>' : ''}
+      <button class="btn" ${bl.length || dirty ? 'disabled' : ''} title="${bl.length ? 'Resolve what blocks planning first' : dirty ? 'Save the grouping first' : ''}">Request plan</button>
+      <button class="btn ghost" style="color:var(--danger)">Cancel exposure</button></div>
+    <table><thead><tr><th style="width:44%">Origin</th><th>Auth</th><th>Pool members</th><th>Found by</th><th style="width:130px">VIP</th></tr></thead><tbody>${body}</tbody></table>
+    <details open><summary>Already published <span class="subtle">· ${pub.length} · no VIP, rewritten to their registry URL</span></summary>
+      <table><thead><tr><th style="width:44%">Origin</th><th>Rewritten to</th><th>Registry note</th></tr></thead><tbody>
+      ${pub.map((k) => { const s = S[k]; return `<tr class="${s.registry_url ? '' : 'blocked'}"><td class="mono">${esc(s.origin)}</td><td class="mono">${s.registry_url ? esc(s.registry_url) : '<span class="tag err small">no URL</span> <a href="#">Set URL</a>'}</td><td class="subtle">${esc(s.note)}</td></tr>`; }).join('')}
+      </tbody></table></details>
+    <details><summary>Excluded <span class="subtle">· ${exc.length}</span></summary>
+      <table><tbody>${exc.map((k) => `<tr><td class="mono" style="width:44%">${esc(S[k].origin)}</td><td><span class="tag small neutral">${S[k].auth}</span></td></tr>`).join('')}</tbody></table></details>
+    <details><summary>Event log <span class="subtle">· ${G.events.length}</span></summary>
+      <table class="events"><tbody>${G.events.slice().reverse().map((e) => `<tr><td class="subtle" style="width:100px">${e.at}</td><td style="width:80px">${e.who}</td><td>${esc(e.what)}</td></tr>`).join('')}</tbody></table></details>`;
+
+  document.querySelectorAll('select[data-svc]').forEach((el) => el.addEventListener('change', () => {
+    let v = el.value;
+    if (v === '__new') { v = 'g' + (groupIds.length + 1) + Math.random().toString(16).slice(2, 5); groupIds.push(v); }
+    groupOf[el.dataset.svc] = v || null; dirty = true; renderGrouping();
+  }));
+  $('#save')?.addEventListener('click', () => { groupIds = groupIds.filter((g) => Object.values(groupOf).includes(g)); dirty = false; renderGrouping(); });
+  $('#discard')?.addEventListener('click', () => location.reload());
+}
+
+function renderPlan() {
+  const sm = PL.summary;
+  const tabs = [['overview', 'VIPs and DNS'], ['rewrite', 'Rewrite map'], ['diff', 'Dry-run diff'], ['decl', 'Declaration']];
+  let content = '';
+  if (tab === 'overview') {
+    content = PL.vips.map((v) => `
+      <div class="toolbar" style="margin-top:12px"><h2>${v.name}</h2><span class="mono">${v.ip}</span><span class="subtle">· certificate <span class="mono">${esc(v.certificate.name)}</span>, expires ${v.certificate.expires}</span></div>
+      <table class="plan"><thead><tr><th style="width:26%">Original origin</th><th style="width:30%">Replaced by</th><th style="width:24%">DNS record</th><th>Pool members</th></tr></thead><tbody>
+      ${v.services.map((s) => `<tr><td class="mono">${esc(s.original)}</td><td class="mono">${esc(s.url)}${s.warn ? ` <span class="tag warn small">${esc(s.warn)}</span>` : ''}</td><td class="mono">A ${new URL(s.url).host} → ${v.ip}</td><td class="mono subtle">${s.pool.join(', ')}</td></tr>`).join('')}
+      </tbody></table>`).join('') + `
+      <div class="toolbar" style="margin-top:12px"><h2>App VIP</h2><span class="mono">${PL.app_vip.ip}</span><span class="subtle">· ${PL.app_vip.name} · exists, rewrite map changes</span></div>`;
+  } else if (tab === 'rewrite') {
+    content = `<table><thead><tr><th>Original origin</th><th>Rewritten to</th><th>From</th></tr></thead><tbody>
+      ${PL.app_vip.rewrite.map((r) => `<tr><td class="mono">${esc(r.original)}</td><td class="mono">${esc(r.url)}</td><td>${r.source === 'new' ? '<span class="tag auth small">this plan</span>' : '<span class="tag neutral small">registry</span>'}</td></tr>`).join('')}</tbody></table>`;
+  } else if (tab === 'diff') {
+    let n = 0;
+    content = `<pre class="diff">${PL.diff.map((l) => `<span class="${l.op === '+' ? 'add' : l.op === '-' ? 'del' : ''}"><span class="ln">${++n}</span>${l.op} ${esc(l.text)}</span>`).join('')}</pre>`;
+  } else {
+    content = `<div class="toolbar"><span class="grow"></span><button class="btn ghost" id="copy">Copy JSON</button></div><pre class="json">${esc(JSON.stringify(PL.declaration, null, 2))}</pre>`;
+  }
+  $('#root').innerHTML = header('Awaiting confirmation', 'attention', PL.version) + `
+    <div class="stats">
+      <div class="add"><span class="muted">To add</span><b>+${sm.add}</b></div><div class="chg"><span class="muted">To change</span><b>~${sm.change}</b></div>
+      <div><span class="muted">To destroy</span><b>${sm.destroy}</b></div><div><span class="muted">IPs reserved</span><b>${sm.ips}</b></div>
+      <div><span class="muted">DNS names</span><b>${sm.dns}</b></div><div><span class="muted">Certificates</span><b>${sm.certificates}</b></div></div>
+    <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${tab === k}" data-tab="${k}">${l}</button>`).join('')}</div>
+    ${content}
+    <div class="confirmbar">
+      <div><b>Warnings</b> <span class="subtle">· planned by ${PL.requested_by} at ${PL.planned_at} · plan ${PL.hash}</span>
+        <ul>${PL.warnings.map((w) => `<li>${w.service ? `<span class="mono">${esc(w.service)}</span>: ` : ''}${esc(w.text)}</li>`).join('')}</ul>
+        <label><input type="checkbox" id="ack"> I have read the warnings</label></div>
+      <div style="display:flex;gap:8px"><button class="btn ghost">Change grouping</button><button class="btn ghost" style="color:var(--danger)">Cancel exposure</button><button class="btn danger" id="open-confirm" disabled>Confirm and deploy</button></div>
+    </div>`;
+  document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { tab = b.dataset.tab; renderPlan(); }));
+  $('#ack').addEventListener('change', (e) => { $('#open-confirm').disabled = !e.target.checked; });
+  $('#open-confirm').addEventListener('click', () => {
+    $('#confirm-body').innerHTML = `<p>Posts the declaration to the F5, then verifies it and creates ${sm.dns} DNS records. A deploy in progress cannot be stopped.</p>
+      <table><tbody><tr><td>Changes</td><td>+${sm.add} ~${sm.change} −${sm.destroy}</td></tr><tr><td>VIPs</td><td class="mono">${PL.vips.map((v) => v.ip).join(', ')}</td></tr>
+      <tr><td>DNS names</td><td class="mono">${PL.vips.flatMap((v) => v.certificate.names).join('<br>')}</td></tr><tr><td>Plan</td><td class="mono">${PL.hash}</td></tr></tbody></table>`;
+    $('#confirm').showModal();
+  });
+}
+
+function render() { state === 'grouping' ? renderGrouping() : renderPlan(); }
+for (const s of ['grouping', 'plan']) $('#s-' + s).addEventListener('click', () => {
+  state = s; $('#s-grouping').setAttribute('aria-pressed', s === 'grouping'); $('#s-plan').setAttribute('aria-pressed', s === 'plan'); render();
+});
+$('#confirm-cancel').addEventListener('click', () => $('#confirm').close());
+$('#confirm-go').addEventListener('click', () => $('#confirm').close());
+render();
+</script>
+</body>
+</html>

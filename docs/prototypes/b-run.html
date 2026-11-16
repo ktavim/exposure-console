@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B · Run page</title>
+<style>
+  :root {
+    --bg: #0a0a0a; --surface: #111; --surface-2: #1a1a1a; --line: #262626; --line-strong: #3a3a3a;
+    --fg: #ededed; --muted: #a1a1a1; --subtle: #737373; --accent: #3b82f6;
+    --green: #22c55e; --green-bg: rgba(34,197,94,.12); --amber: #f5a524; --amber-bg: rgba(245,165,36,.12);
+    --red: #f04444; --red-bg: rgba(240,68,68,.12); --blue-bg: rgba(59,130,246,.14);
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); }
+  .mono { font-family: var(--mono); font-size: 13px; }
+  .muted { color: var(--muted); } .subtle { color: var(--subtle); }
+  nav.top { display: flex; align-items: center; gap: 20px; padding: 0 24px; height: 52px; border-bottom: 1px solid var(--line); }
+  nav.top b { font-weight: 600; } nav.top a { color: var(--muted); text-decoration: none; } nav.top a.on { color: var(--fg); }
+  .proto { margin-left: auto; display: flex; gap: 2px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 2px; font-size: 12px; }
+  .proto button { background: none; border: 0; color: var(--muted); padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+  .proto button[aria-pressed="true"] { background: var(--line-strong); color: var(--fg); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 32px 24px 120px; display: grid; grid-template-columns: 220px 1fr; gap: 40px; }
+  .hero { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 16px; }
+  .hero h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -.02em; }
+  .hero .sub { color: var(--muted); margin-top: 4px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 500; border: 1px solid; }
+  .pill.neutral { color: var(--muted); border-color: var(--line-strong); }
+  .pill.amber { color: var(--amber); border-color: rgba(245,165,36,.4); background: var(--amber-bg); }
+  .pill.red { color: var(--red); border-color: rgba(240,68,68,.4); background: var(--red-bg); }
+  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .hero .actions { margin-left: auto; display: flex; gap: 8px; }
+  .btn { font: inherit; font-size: 13px; font-weight: 500; border-radius: 6px; padding: 7px 14px; cursor: pointer; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--fg); }
+  .btn:hover { border-color: #555; } .btn.primary { background: var(--fg); color: #000; border-color: var(--fg); }
+  .btn.danger { background: var(--red); border-color: var(--red); color: #fff; } .btn.quiet { background: none; border-color: transparent; color: var(--muted); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  ol.steps { list-style: none; margin: 0; padding: 0; position: sticky; top: 24px; align-self: start; }
+  ol.steps li { position: relative; padding: 0 0 22px 28px; color: var(--subtle); font-size: 13px; }
+  ol.steps li::before { content: ""; position: absolute; left: 7px; top: 18px; bottom: 0; width: 1px; background: var(--line-strong); }
+  ol.steps li:last-child::before { display: none; }
+  ol.steps .ic { position: absolute; left: 0; top: 2px; width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--bg); display: grid; place-items: center; font-size: 9px; }
+  ol.steps li.done { color: var(--muted); } ol.steps li.done .ic { background: var(--green); border-color: var(--green); color: #000; }
+  ol.steps li.now { color: var(--fg); font-weight: 600; } ol.steps li.now .ic { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-bg); background: var(--amber); }
+  ol.steps li small { display: block; font-weight: 400; color: var(--subtle); }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+  .card { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 16px; }
+  .card .k { color: var(--muted); font-size: 12px; } .card .v { font-size: 24px; font-weight: 600; letter-spacing: -.02em; margin-top: 2px; }
+  .card .v .g { color: var(--green); } .card .v .a { color: var(--amber); } .card .v .r { color: var(--subtle); }
+  section { margin-bottom: 32px; }
+  section > h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; } section > p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  .vip { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin-bottom: 12px; overflow: hidden; }
+  .vip.drop { outline: 2px dashed var(--accent); }
+  .vip-hd { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  .vip-hd b { font-weight: 600; } .vip-hd .grow { flex: 1; }
+  .svc { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 16px; border-top: 1px solid var(--line); }
+  .svc:first-of-type { border-top: 0; }
+  .svc .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .chip { font-size: 11px; border-radius: 4px; padding: 1px 6px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+  .chip.blue { background: var(--blue-bg); color: #93c5fd; border-color: transparent; }
+  .msg { font-size: 12px; margin-top: 6px; display: flex; gap: 6px; } .msg.red { color: var(--red); } .msg.amber { color: var(--amber); }
+  .map { display: grid; grid-template-columns: 1fr 24px 1fr; align-items: center; gap: 8px; }
+  .map .arrow { color: var(--subtle); text-align: center; }
+  .menu { position: relative; } .menu-list { position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 5; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 8px; padding: 4px; min-width: 160px; }
+  .menu-list button { display: block; width: 100%; text-align: left; background: none; border: 0; color: var(--fg); padding: 6px 10px; border-radius: 4px; font: inherit; font-size: 13px; cursor: pointer; }
+  .menu-list button:hover { background: var(--line-strong); }
+  .list { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  .list .row { display: grid; grid-template-columns: 1fr 24px 1fr auto; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); align-items: center; }
+  .list .row:first-child { border-top: 0; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font-family: var(--mono); font-size: 12px; }
+  .split .col { overflow-x: auto; } .split .col + .col { border-left: 1px solid var(--line); }
+  .split .hd { padding: 8px 12px; background: var(--surface-2); color: var(--muted); font-family: system-ui; font-size: 12px; border-bottom: 1px solid var(--line); }
+  .split .l { white-space: pre; padding: 0 12px; min-height: 18px; } .split .l.add { background: var(--green-bg); color: #86efac; } .split .l.del { background: var(--red-bg); color: #fca5a5; } .split .l.gap { background: repeating-linear-gradient(135deg, transparent 0 4px, #161616 4px 8px); }
+  .deploybar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(17,17,17,.92); backdrop-filter: blur(8px); border-top: 1px solid var(--line-strong); }
+  .deploybar .in { max-width: 1200px; margin: 0 auto; padding: 14px 24px; display: flex; gap: 20px; align-items: center; }
+  .deploybar .w { flex: 1; font-size: 13px; color: var(--amber); }
+  .deploybar input { font: inherit; background: var(--bg); color: var(--fg); border: 1px solid var(--line-strong); border-radius: 6px; padding: 6px 10px; width: 180px; }
+  details.decl summary { cursor: pointer; color: var(--muted); }
+  details.decl pre { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow: auto; font-family: var(--mono); font-size: 12px; max-height: 400px; }
+</style>
+</head>
+<body>
+<nav class="top">
+  <b>▲ Exposures</b><a href="#" class="on">Queue</a><a href="#">History</a>
+  <div class="proto" role="group" aria-label="Prototype state">
+    <button id="s-grouping" aria-pressed="true">Grouping</button><button id="s-plan" aria-pressed="false">Plan review</button>
+  </div>
+</nav>
+<div class="wrap" id="root"></div>
+<div id="bar"></div>
+<script src="data.js"></script>
+<script>
+const P = window.PROTO, G = P.grouping, PL = P.plan;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let state = 'grouping', openMenu = null;
+const groupOf = {}; for (const g of G.groups) for (const s of g.services) groupOf[s] = g.id;
+let groupIds = G.groups.map((g) => g.id);
+
+const STEPS = [['Submitted', 'jchen · 11-12 10:41'], ['Grouping'], ['Planning'], ['Confirm'], ['Deploy'], ['Verify'], ['DNS records'], ['Registered']];
+function steps(now) {
+  return `<ol class="steps">${STEPS.map(([n, sub], i) => `<li class="${i < now ? 'done' : i === now ? 'now' : ''}"><span class="ic">${i < now ? '✓' : ''}</span>${n}${sub ? `<small>${sub}</small>` : ''}</li>`).join('')}</ol>`;
+}
+function hero(pill, actions, version) {
+  return `<div class="hero"><div><h1>${esc(P.app.name)}</h1>
+    <div class="sub">${pill} <span class="mono">${esc(P.app.url)}</span> · version ${version} · replaces <span class="mono">${G.supersedes}</span></div></div>
+    <div class="actions">${actions}</div></div>`;
+}
+
+function renderGrouping() {
+  const S = G.services, need = Object.keys(S).filter((k) => S[k].scope === 'needs_vip');
+  const bl = G.blocked_by.filter((b) => !(b.service === 'search' && groupOf.search));
+  const svc = (k) => {
+    const s = S[k];
+    const msgs = bl.filter((b) => b.service === k).map((b) => `<div class="msg red">● ${esc(b.message)}</div>`).join('') + (G.warnings[k] || []).map((w) => `<div class="msg amber">▲ ${esc(w)}</div>`).join('');
+    const targets = [...groupIds.map((g, i) => [g, `VIP ${i + 1}`]), ['__new', 'A new VIP']].filter(([g]) => g !== groupOf[k]);
+    return `<div class="svc" draggable="true" data-svc="${k}"><div><div class="mono">${esc(s.origin)}</div>
+      <div class="chips"><span class="chip blue">${s.auth}</span><span class="chip">${s.ips.length} pool member${s.ips.length > 1 ? 's' : ''}</span><span class="chip">${s.found_by.join(' + ')}</span></div>${msgs}</div>
+      <div class="menu"><button class="btn quiet" data-menu="${k}" aria-haspopup="true">Move ▾</button>
+      ${openMenu === k ? `<div class="menu-list">${targets.map(([g, l]) => `<button data-move="${k}" data-to="${g}">${l}</button>`).join('')}</div>` : ''}</div></div>`;
+  };
+  const loose = need.filter((k) => !groupOf[k]);
+  const pub = Object.keys(S).filter((k) => S[k].scope === 'published'), exc = Object.keys(S).filter((k) => S[k].scope === 'excluded');
+  $('#root').innerHTML = hero(`<span class="pill neutral"><span class="dot"></span>Grouping</span>`,
+      `<button class="btn quiet">Cancel exposure</button><button class="btn primary" ${bl.length ? 'disabled' : ''}>Request plan</button>`, G.version)
+    + steps(1) + `<div>
+    <div class="cards">
+      <div class="card"><div class="k">Need a VIP</div><div class="v">${need.length}</div></div>
+      <div class="card"><div class="k">VIP groups</div><div class="v">${groupIds.length}</div></div>
+      <div class="card"><div class="k">Blocking planning</div><div class="v" style="color:${bl.length ? 'var(--red)' : 'var(--green)'}">${bl.length}</div></div>
+    </div>
+    ${bl.length ? `<section style="border:1px solid rgba(240,68,68,.4);background:var(--red-bg);border-radius:10px;padding:14px 16px"><h2 style="color:var(--red)">Planning is blocked</h2>${bl.map((b) => `<div class="msg red">● ${esc(b.message)}</div>`).join('')}</section>` : ''}
+    <section><h2>VIP groups</h2><p>Services on one VIP share its IP and HTTPS on 443. Drag a service, or use Move.</p>
+      ${groupIds.map((g, i) => { const m = need.filter((k) => groupOf[k] === g); return `<div class="vip" data-drop="${g}"><div class="vip-hd"><b>VIP ${i + 1}</b><span class="subtle">${m.length} service${m.length === 1 ? '' : 's'}</span><span class="grow"></span>${m.length ? '' : '<span class="subtle">Empty</span>'}</div>${m.map(svc).join('')}</div>`; }).join('')}
+      ${loose.length ? `<div class="vip" data-drop="" style="border-color:rgba(240,68,68,.5)"><div class="vip-hd"><b style="color:var(--red)">Not grouped</b><span class="subtle">${loose.length}</span></div>${loose.map(svc).join('')}</div>` : ''}
+      <div class="vip" data-drop="__new" style="border-style:dashed;text-align:center;padding:14px;color:var(--subtle)">Drop here for a new VIP</div>
+    </section>
+    <section><h2>Already published</h2><p>No VIP. The app's rewrite map points them at their registry URL.</p><div class="list">
+      ${pub.map((k) => { const s = S[k]; return `<div class="row"><span class="mono">${esc(s.origin)}</span><span class="subtle">→</span><span class="mono">${s.registry_url ? esc(s.registry_url) : '<span style="color:var(--red)">no URL in the registry</span>'}</span>${s.registry_url ? `<span class="subtle" style="font-size:12px">${esc(s.note)}</span>` : '<button class="btn">Set URL</button>'}</div>`; }).join('')}</div></section>
+    <section><h2>Excluded</h2><div class="list">${exc.map((k) => `<div class="row"><span class="mono subtle">${esc(S[k].origin)}</span><span></span><span class="chip" style="justify-self:start">${S[k].auth}</span><span></span></div>`).join('')}</div></section>
+    <section><h2>Activity</h2><div class="list">${G.events.slice().reverse().map((e) => `<div class="row" style="grid-template-columns:110px 80px 1fr"><span class="subtle">${e.at}</span><span>${e.who}</span><span class="muted">${esc(e.what)}</span></div>`).join('')}</div></section>
+  </div>`;
+  $('#bar').innerHTML = '';
+  document.querySelectorAll('[data-menu]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); openMenu = openMenu === b.dataset.menu ? null : b.dataset.menu; renderGrouping(); }));
+  document.querySelectorAll('[data-move]').forEach((b) => b.addEventListener('click', () => move(b.dataset.move, b.dataset.to)));
+  document.querySelectorAll('[draggable]').forEach((el) => el.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', el.dataset.svc)));
+  document.querySelectorAll('[data-drop]').forEach((el) => {
+    el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('drop'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drop'));
+    el.addEventListener('drop', (e) => { e.preventDefault(); move(e.dataTransfer.getData('text/plain'), el.dataset.drop); });
+  });
+}
+function move(k, to) {
+  if (to === '__new') { to = 'g' + Math.random().toString(16).slice(2, 7); groupIds.push(to); }
+  groupOf[k] = to || null; openMenu = null;
+  groupIds = groupIds.filter((g) => Object.values(groupOf).includes(g));
+  renderGrouping();
+}
+document.addEventListener('click', () => { if (openMenu) { openMenu = null; renderGrouping(); } });
+
+function renderPlan() {
+  const sm = PL.summary;
+  // The unified diff, laid side by side: removals on the left, additions on the right.
+  const left = [], right = [];
+  for (const l of PL.diff) {
+    if (l.op === ' ') { while (left.length < right.length) left.push(null); while (right.length < left.length) right.push(null); left.push(l); right.push(l); }
+    else if (l.op === '-') left.push(l); else right.push(l);
+  }
+  while (left.length < right.length) left.push(null);
+  const col = (lines, side) => lines.map((l) => l ? `<div class="l ${l.op === '+' ? 'add' : l.op === '-' ? 'del' : ''}">${esc(l.text)}</div>` : `<div class="l gap"></div>`).join('');
+  $('#root').innerHTML = hero(`<span class="pill amber"><span class="dot"></span>Awaiting confirmation</span>`,
+      `<button class="btn quiet">Change grouping</button><button class="btn quiet" style="color:var(--red)">Cancel exposure</button>`, PL.version)
+    + steps(3) + `<div>
+    <div class="cards">
+      <div class="card"><div class="k">On the F5</div><div class="v"><span class="g">+${sm.add}</span> <span class="a">~${sm.change}</span> <span class="r">−${sm.destroy}</span></div></div>
+      <div class="card"><div class="k">IPs reserved</div><div class="v">${sm.ips}</div></div>
+      <div class="card"><div class="k">DNS names · certificates</div><div class="v">${sm.dns} · ${sm.certificates}</div></div>
+    </div>
+    ${PL.vips.map((v) => `<section class="vip"><div class="vip-hd"><b>${v.name}</b><span class="mono">${v.ip}</span><span class="grow"></span><span class="pill neutral" style="font-weight:400">🔒 ${v.certificate.names.length} name${v.certificate.names.length > 1 ? 's' : ''} · expires ${v.certificate.expires}</span></div>
+      ${v.services.map((s) => `<div class="svc" style="grid-template-columns:1fr"><div class="map"><span class="mono subtle">${esc(s.original)}</span><span class="arrow">→</span><span class="mono">${esc(s.url)}</span></div>
+        <div class="chips"><span class="chip">pool ${s.pool.join(', ')}</span><span class="chip">A ${new URL(s.url).host} → ${v.ip}</span>${s.warn ? `<span class="chip" style="color:var(--amber)">▲ ${esc(s.warn)}</span>` : ''}</div></div>`).join('')}</section>`).join('')}
+    <section style="margin-top:28px"><h2>App VIP · rewrite map</h2><p><span class="mono">${PL.app_vip.name}</span> at <span class="mono">${PL.app_vip.ip}</span> already exists; its map gains ${PL.app_vip.rewrite.filter((r) => r.source === 'new').length} entries.</p>
+      <div class="list">${PL.app_vip.rewrite.map((r) => `<div class="row"><span class="mono ${r.source === 'new' ? '' : 'subtle'}">${esc(r.original)}</span><span class="subtle">→</span><span class="mono ${r.source === 'new' ? '' : 'subtle'}">${esc(r.url)}</span><span class="chip ${r.source === 'new' ? 'blue' : ''}">${r.source === 'new' ? 'new' : 'published'}</span></div>`).join('')}</div></section>
+    <section><h2>Dry-run diff</h2><p>What posting the declaration changes on the F5.</p>
+      <div class="split"><div class="col"><div class="hd">Live on the F5</div>${col(left)}</div><div class="col"><div class="hd">After deploy</div>${col(right)}</div></div></section>
+    <section><details class="decl"><summary>Full AS3 declaration</summary><pre>${esc(JSON.stringify(PL.declaration, null, 2))}</pre></details></section>
+  </div>`;
+  $('#bar').innerHTML = `<div class="deploybar"><div class="in">
+    <div class="w">▲ ${PL.warnings.length} warnings: ${PL.warnings.map((w) => esc(w.text.split(':')[0].split('.')[0])).join(' · ')}</div>
+    <label class="subtle" style="font-size:12px">Type <b class="mono" style="color:var(--fg)">payroll</b> to deploy <input id="typed" autocomplete="off"></label>
+    <button class="btn danger" id="deploy" disabled>Deploy to F5</button></div></div>`;
+  $('#typed').addEventListener('input', (e) => { $('#deploy').disabled = e.target.value.trim() !== 'payroll'; });
+}
+
+function render() { state === 'grouping' ? renderGrouping() : renderPlan(); }
+for (const s of ['grouping', 'plan']) $('#s-' + s).addEventListener('click', () => {
+  state = s; $('#s-grouping').setAttribute('aria-pressed', s === 'grouping'); $('#s-plan').setAttribute('aria-pressed', s === 'plan'); render();
+});
+render();
+</script>
+</body>
+</html>

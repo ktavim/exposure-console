@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C · Master and detail</title>
+<style>
+  :root {
+    --bg: #ffffff; --side: #f6f8fa; --surface: #ffffff; --surface-2: #f6f8fa; --line: #d1d9e0; --line-soft: #e6eaef;
+    --fg: #1f2328; --muted: #59636e; --subtle: #818b98; --accent: #0969da; --accent-bg: #ddf4ff;
+    --red: #d1242f; --red-bg: #ffebe9; --amber: #9a6700; --amber-bg: #fff8c5; --green: #1a7f37; --green-bg: #dafbe1;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1117; --side: #010409; --surface: #0d1117; --surface-2: #151b23; --line: #3d444d; --line-soft: #262c36;
+      --fg: #f0f6fc; --muted: #9198a1; --subtle: #6e7681; --accent: #4493f8; --accent-bg: rgba(56,139,253,.15);
+      --red: #f85149; --red-bg: rgba(248,81,73,.12); --amber: #d29922; --amber-bg: rgba(187,128,9,.15); --green: #3fb950; --green-bg: rgba(46,160,67,.15);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1117; --side: #010409; --surface: #0d1117; --surface-2: #151b23; --line: #3d444d; --line-soft: #262c36;
+    --fg: #f0f6fc; --muted: #9198a1; --subtle: #6e7681; --accent: #4493f8; --accent-bg: rgba(56,139,253,.15);
+    --red: #f85149; --red-bg: rgba(248,81,73,.12); --amber: #d29922; --amber-bg: rgba(187,128,9,.15); --green: #3fb950; --green-bg: rgba(46,160,67,.15);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); display: grid; grid-template-rows: auto auto 1fr; }
+  .mono { font-family: var(--mono); font-size: 12.5px; }
+  .muted { color: var(--muted); } .subtle { color: var(--subtle); }
+  .top { display: flex; align-items: center; gap: 16px; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--side); }
+  .top b { font-weight: 600; } .top a { color: var(--muted); text-decoration: none; }
+  .proto { margin-left: auto; display: flex; gap: 6px; align-items: center; font-size: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { font: inherit; background: var(--surface); color: var(--fg); border: 0; padding: 3px 10px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); } .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  .head { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  .head h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .head .meta { color: var(--muted); font-size: 13px; }
+  .head .grow { flex: 1; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; border-radius: 999px; padding: 1px 9px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.amber { background: var(--amber-bg); color: var(--amber); border-color: transparent; }
+  .badge.red { background: var(--red-bg); color: var(--red); border-color: transparent; }
+  .count { font-size: 12px; border-radius: 999px; padding: 0 7px; background: var(--line-soft); color: var(--muted); }
+  .count.red { background: var(--red); color: #fff; }
+  .btn { font: inherit; font-size: 13px; font-weight: 500; border-radius: 6px; padding: 5px 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); cursor: pointer; }
+  .btn.primary { background: var(--green); border-color: var(--green); color: #fff; } .btn.danger { color: var(--red); }
+  .btn.danger-solid { background: var(--red); border-color: var(--red); color: #fff; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .body { display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
+  aside { background: var(--side); border-right: 1px solid var(--line); overflow: auto; padding: 12px 8px; }
+  aside h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--subtle); margin: 14px 8px 4px; font-weight: 600; }
+  aside button.item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font: inherit; background: none; border: 0; color: var(--fg); border-radius: 6px; padding: 6px 8px; cursor: pointer; }
+  aside button.item:hover { background: var(--line-soft); } aside button.item[aria-current="true"] { background: var(--accent-bg); box-shadow: inset 2px 0 var(--accent); }
+  aside button.item .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; } .dot.red { background: var(--red); } .dot.green { background: var(--green); } .dot.amber { background: var(--amber); } .dot.grey { background: var(--subtle); }
+  .detail { overflow: auto; padding: 20px 24px 40px; }
+  .detail h2 { font-size: 16px; margin: 0 0 4px; } .detail > p { margin: 0 0 16px; color: var(--muted); }
+  .board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+  .col { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; min-height: 160px; }
+  .col.drop { outline: 2px solid var(--accent); }
+  .col h4 { margin: 2px 4px 8px; font-size: 13px; display: flex; gap: 6px; align-items: center; }
+  .col.loose { border-color: var(--red); } .col.new { border-style: dashed; display: grid; place-items: center; color: var(--subtle); min-height: 80px; }
+  .cardx { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; cursor: grab; }
+  .cardx:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .cardx .o { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .cardx .s { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .cardx .m { font-size: 12px; margin-top: 6px; padding: 4px 6px; border-radius: 4px; }
+  .cardx .m.red { background: var(--red-bg); color: var(--red); } .cardx .m.amber { background: var(--amber-bg); color: var(--amber); }
+  .kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--surface-2); }
+  table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; background: var(--surface-2); padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  td { padding: 8px 12px; border-top: 1px solid var(--line-soft); vertical-align: top; }
+  .file { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+  .file-hd { display: flex; gap: 8px; align-items: center; padding: 8px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line); font-size: 13px; }
+  .file-hd .grow { flex: 1; }
+  .diff { font-family: var(--mono); font-size: 12px; overflow-x: auto; }
+  .diff div { white-space: pre; padding: 0 12px; display: grid; grid-template-columns: 36px 16px 1fr; }
+  .diff .n { color: var(--subtle); user-select: none; text-align: right; padding-right: 8px; }
+  .diff .add { background: var(--green-bg); } .diff .del { background: var(--red-bg); }
+  .diff .hunk { background: var(--accent-bg); color: var(--muted); }
+  pre.json { margin: 0; padding: 12px; font-family: var(--mono); font-size: 12px; overflow: auto; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 440px; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.15); padding: 20px; overflow: auto; z-index: 10; }
+  .drawer h2 { margin: 0 0 12px; font-size: 18px; }
+  .drawer ol { padding-left: 18px; } .drawer li { margin-bottom: 8px; }
+  .drawer .warn { background: var(--amber-bg); color: var(--amber); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; font-size: 13px; }
+  .drawer label { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; margin-bottom: 6px; }
+  .log li { font-size: 13px; margin-bottom: 6px; list-style: none; } .log { padding: 0; }
+</style>
+</head>
+<body>
+<div class="top">
+  <b>Exposure Console</b><a href="#">Queue</a><a href="#">History</a>
+  <div class="proto">
+    <span class="subtle">Prototype</span>
+    <span class="seg" role="group" aria-label="Prototype state"><button id="s-grouping" aria-pressed="true">Grouping</button><button id="s-plan" aria-pressed="false">Plan review</button></span>
+    <span class="seg" role="group" aria-label="Theme"><button data-theme="light">Light</button><button data-theme="dark">Dark</button></span>
+  </div>
+</div>
+<div class="head" id="head"></div>
+<div class="body"><aside id="side"></aside><div class="detail" id="detail"></div></div>
+<div id="drawer"></div>
+<script src="data.js"></script>
+<script>
+const P = window.PROTO, G = P.grouping, PL = P.plan;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let state = 'grouping', sel = 'board', planSel = 'summary', drawer = false;
+const groupOf = {}; for (const g of G.groups) for (const s of g.services) groupOf[s] = g.id;
+let groupIds = G.groups.map((g) => g.id);
+const S = G.services, need = Object.keys(S).filter((k) => S[k].scope === 'needs_vip');
+const blockers = () => G.blocked_by.filter((b) => !(b.service === 'search' && groupOf.search));
+
+function renderGrouping() {
+  const bl = blockers();
+  $('#head').innerHTML = `<h1>${esc(P.app.name)}</h1><span class="badge">◫ Grouping</span><span class="meta mono">${esc(P.app.url)}</span>
+    <span class="meta">v${G.version} · submitted ${G.submitted_at} by ${G.submitted_by}</span><span class="grow"></span>
+    <button class="btn danger">Cancel exposure</button><button class="btn primary" ${bl.length ? 'disabled title="Resolve what blocks planning first"' : ''}>Request plan</button>`;
+  const pub = Object.keys(S).filter((k) => S[k].scope === 'published'), exc = Object.keys(S).filter((k) => S[k].scope === 'excluded');
+  const blockedSvc = new Set(bl.map((b) => b.service));
+  $('#side').innerHTML = `
+    <button class="item" data-sel="board" aria-current="${sel === 'board'}"><span class="grow">All VIP groups</span><span class="count">${groupIds.length}</span></button>
+    <button class="item" data-sel="blocked" aria-current="${sel === 'blocked'}"><span class="grow">What blocks planning</span><span class="count ${bl.length ? 'red' : ''}">${bl.length}</span></button>
+    <h3>Groups</h3>
+    ${groupIds.map((g, i) => { const m = need.filter((k) => groupOf[k] === g); const red = m.some((k) => blockedSvc.has(k)); return `<button class="item" data-sel="${g}" aria-current="${sel === g}"><span class="dot ${red ? 'red' : 'green'}" aria-label="${red ? 'blocked' : 'ok'}"></span><span class="grow">VIP ${i + 1} · ${m.map((k) => new URL(S[k].origin).hostname.split('.')[0]).join(', ')}</span><span class="count">${m.length}</span></button>`; }).join('')}
+    ${need.some((k) => !groupOf[k]) ? `<button class="item" data-sel="board"><span class="dot red"></span><span class="grow">Not grouped</span><span class="count red">${need.filter((k) => !groupOf[k]).length}</span></button>` : ''}
+    <h3>Read only</h3>
+    <button class="item" data-sel="published" aria-current="${sel === 'published'}"><span class="dot ${pub.some((k) => blockedSvc.has(k)) ? 'red' : 'grey'}"></span><span class="grow">Already published</span><span class="count">${pub.length}</span></button>
+    <button class="item" data-sel="excluded" aria-current="${sel === 'excluded'}"><span class="dot grey"></span><span class="grow">Excluded</span><span class="count">${exc.length}</span></button>
+    <button class="item" data-sel="log" aria-current="${sel === 'log'}"><span class="dot grey"></span><span class="grow">Event log</span><span class="count">${G.events.length}</span></button>`;
+
+  const card = (k) => {
+    const s = S[k];
+    return `<div class="cardx" draggable="true" tabindex="0" data-svc="${k}" aria-label="${esc(s.origin)}"><div class="o">${esc(s.origin)}</div>
+      <div class="s">${s.auth} · ${s.ips.length} member${s.ips.length > 1 ? 's' : ''} · ${s.found_by.join('+')}</div>
+      ${bl.filter((b) => b.service === k).map((b) => `<div class="m red">${esc(b.message)}</div>`).join('')}
+      ${(G.warnings[k] || []).map((w) => `<div class="m amber">${esc(w)}</div>`).join('')}</div>`;
+  };
+  let html = '';
+  if (sel === 'board' || groupIds.includes(sel)) {
+    const shown = sel === 'board' ? groupIds : [sel];
+    html = `<h2>${sel === 'board' ? 'VIP groups' : 'VIP ' + (groupIds.indexOf(sel) + 1)}</h2>
+      <p>Drag cards between columns, or focus one and press <span class="kbd">1</span>–<span class="kbd">9</span> for a VIP, <span class="kbd">N</span> for a new one, <span class="kbd">0</span> to ungroup.</p>
+      <div class="board">
+      ${need.some((k) => !groupOf[k]) && sel === 'board' ? `<div class="col loose" data-drop=""><h4 style="color:var(--red)">Not grouped</h4>${need.filter((k) => !groupOf[k]).map(card).join('')}</div>` : ''}
+      ${shown.map((g) => `<div class="col" data-drop="${g}"><h4>VIP ${groupIds.indexOf(g) + 1} <span class="count">${need.filter((k) => groupOf[k] === g).length}</span></h4>${need.filter((k) => groupOf[k] === g).map(card).join('')}</div>`).join('')}
+      ${sel === 'board' ? '<div class="col new" data-drop="__new">+ New VIP</div>' : ''}</div>`;
+  } else if (sel === 'blocked') {
+    html = `<h2>What blocks planning</h2><p>Fixed here, or on a new scan.</p><table><tbody>${bl.map((b) => `<tr><td><span class="dot red" style="display:inline-block"></span></td><td>${esc(b.message)}</td></tr>`).join('') || '<tr><td>Nothing. A plan can be requested.</td></tr>'}</tbody></table>`;
+  } else if (sel === 'published') {
+    html = `<h2>Already published</h2><p>No VIP. The app's rewrite map points them at their registry URL.</p><table><thead><tr><th>Origin</th><th>Rewritten to</th><th>Registry</th></tr></thead><tbody>
+      ${pub.map((k) => `<tr><td class="mono">${esc(S[k].origin)}</td><td class="mono">${S[k].registry_url ? esc(S[k].registry_url) : '<span class="badge red">no URL</span> <button class="btn">Set URL</button>'}</td><td class="subtle">${esc(S[k].note)}</td></tr>`).join('')}</tbody></table>`;
+  } else if (sel === 'excluded') {
+    html = `<h2>Excluded</h2><p>Excluded on the scan; out of scope.</p><table><tbody>${exc.map((k) => `<tr><td class="mono">${esc(S[k].origin)}</td><td class="subtle">${S[k].auth}</td></tr>`).join('')}</tbody></table>`;
+  } else {
+    html = `<h2>Event log</h2><ul class="log">${G.events.slice().reverse().map((e) => `<li><span class="subtle mono">${e.at}</span> <b>${e.who}</b> ${esc(e.what)}</li>`).join('')}</ul>`;
+  }
+  $('#detail').innerHTML = html;
+  wire();
+}
+
+function move(k, to) {
+  if (to === '__new') { to = 'g' + Math.random().toString(16).slice(2, 7); groupIds.push(to); }
+  groupOf[k] = to || null;
+  groupIds = groupIds.filter((g) => Object.values(groupOf).includes(g));
+  if (!groupIds.includes(sel) && sel.startsWith('g')) sel = 'board';
+  renderGrouping();
+  document.querySelector(`[data-svc="${k}"]`)?.focus();
+}
+
+function wire() {
+  document.querySelectorAll('[data-sel]').forEach((b) => b.addEventListener('click', () => { sel = b.dataset.sel; render(); }));
+  document.querySelectorAll('[data-svc]').forEach((el) => {
+    el.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', el.dataset.svc));
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'n' || e.key === 'N') move(el.dataset.svc, '__new');
+      else if (e.key === '0') move(el.dataset.svc, '');
+      else if (/^[1-9]$/.test(e.key) && groupIds[+e.key - 1]) move(el.dataset.svc, groupIds[+e.key - 1]);
+    });
+  });
+  document.querySelectorAll('[data-drop]').forEach((el) => {
+    el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('drop'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drop'));
+    el.addEventListener('drop', (e) => { e.preventDefault(); move(e.dataTransfer.getData('text/plain'), el.dataset.drop); });
+  });
+}
+
+function renderPlan() {
+  const sm = PL.summary;
+  $('#head').innerHTML = `<h1>${esc(P.app.name)}</h1><span class="badge amber">◷ Awaiting confirmation</span><span class="meta mono">${esc(P.app.url)}</span>
+    <span class="meta">v${PL.version} · planned ${PL.planned_at} by ${PL.requested_by}</span><span class="grow"></span>
+    <span class="meta"><b style="color:var(--green)">+${sm.add}</b> <b style="color:var(--amber)">~${sm.change}</b> <b>−${sm.destroy}</b></span>
+    <button class="btn">Change grouping</button><button class="btn danger">Cancel exposure</button>
+    <button class="btn primary" id="review">Review and deploy <span class="count" style="background:var(--amber-bg);color:var(--amber)">▲ ${PL.warnings.length}</span></button>`;
+  const items = [['summary', 'Summary', '', 'grey'], ...PL.vips.map((v, i) => ['vip' + i, `${v.name} · ${v.ip}`, `+${v.services.length + 1}`, 'green']), ['app', 'App VIP · rewrite map', '~1', 'amber'], ['diff', 'Dry-run diff', `${PL.diff.filter((l) => l.op !== ' ').length}`, 'amber'], ['decl', 'Declaration', '', 'grey']];
+  $('#side').innerHTML = `<h3>Plan <span class="mono" style="text-transform:none;letter-spacing:0">${esc(PL.hash)}</span></h3>` + items.map(([k, l, c, d]) => `<button class="item" data-psel="${k}" aria-current="${planSel === k}"><span class="dot ${d}"></span><span class="grow">${l}</span>${c ? `<span class="count">${c}</span>` : ''}</button>`).join('');
+  let html = '';
+  if (planSel === 'summary') {
+    html = `<h2>What deploying does</h2><p>Reserved and installed while planning; posted, verified and published in DNS only on deploy.</p>
+      <table><thead><tr><th>Name</th><th>Type</th><th>Target</th><th>Certificate</th></tr></thead><tbody>
+      ${PL.vips.flatMap((v) => v.services.map((s) => `<tr><td class="mono">${new URL(s.url).host}</td><td>A</td><td class="mono">${v.ip}</td><td class="subtle">${v.certificate.name.split('/').pop()} · until ${v.certificate.expires}</td></tr>`)).join('')}
+      <tr><td class="mono">${PL.app_vip.name}</td><td>A</td><td class="mono">${PL.app_vip.ip}</td><td class="subtle">exists, unchanged</td></tr></tbody></table>`;
+  } else if (planSel.startsWith('vip')) {
+    const v = PL.vips[+planSel.slice(3)];
+    html = `<h2>${v.name} <span class="mono subtle" style="font-weight:400">${v.ip}</span></h2><p>Certificate <span class="mono">${esc(v.certificate.name)}</span> for ${v.certificate.names.map((n) => `<span class="mono">${n}</span>`).join(', ')}, expires ${v.certificate.expires}.</p>
+      <table><thead><tr><th>Original origin</th><th>Replaced by</th><th>Pool</th></tr></thead><tbody>${v.services.map((s) => `<tr><td class="mono">${esc(s.original)}</td><td class="mono">${esc(s.url)}${s.warn ? `<div class="badge amber" style="margin-top:4px">▲ ${esc(s.warn)}</div>` : ''}</td><td class="mono subtle">${s.pool.join('<br>')}</td></tr>`).join('')}</tbody></table>`;
+  } else if (planSel === 'app') {
+    html = `<h2>App VIP · rewrite map</h2><p><span class="mono">${PL.app_vip.name}</span> at <span class="mono">${PL.app_vip.ip}</span>. New entries are this plan's; the rest come from the registry.</p>
+      <table><thead><tr><th>Original origin</th><th>Rewritten to</th><th></th></tr></thead><tbody>${PL.app_vip.rewrite.map((r) => `<tr><td class="mono">${esc(r.original)}</td><td class="mono">${esc(r.url)}</td><td>${r.source === 'new' ? '<span class="badge" style="color:var(--green)">+ new</span>' : '<span class="subtle">registry</span>'}</td></tr>`).join('')}</tbody></table>`;
+  } else if (planSel === 'diff') {
+    let o = 0, n = 0;
+    html = `<div class="file"><div class="file-hd"><b>exp_payroll</b><span class="mono subtle">tenant</span><span class="grow"></span><span style="color:var(--green)">+${PL.diff.filter((l) => l.op === '+').length}</span><span style="color:var(--red)">−${PL.diff.filter((l) => l.op === '-').length}</span></div>
+      <div class="diff"><div class="hunk"><span class="n"></span><span></span>@@ dry run against the live declaration @@</div>
+      ${PL.diff.map((l) => { const num = l.op === '-' ? ++o : l.op === '+' ? ++n : (++o, ++n); return `<div class="${l.op === '+' ? 'add' : l.op === '-' ? 'del' : ''}"><span class="n">${num}</span><span>${l.op}</span>${esc(l.text)}</div>`; }).join('')}</div></div>`;
+  } else {
+    html = `<div class="file"><div class="file-hd"><b>declaration.json</b><span class="grow"></span><button class="btn">Copy</button></div><pre class="json">${esc(JSON.stringify(PL.declaration, null, 2))}</pre></div>`;
+  }
+  $('#detail').innerHTML = html;
+  document.querySelectorAll('[data-psel]').forEach((b) => b.addEventListener('click', () => { planSel = b.dataset.psel; renderPlan(); }));
+  $('#review').addEventListener('click', () => { drawer = true; renderDrawer(); });
+  renderDrawer();
+}
+
+function renderDrawer() {
+  if (!drawer || state !== 'plan') { $('#drawer').innerHTML = ''; return; }
+  const sm = PL.summary;
+  $('#drawer').innerHTML = `<div class="drawer" role="dialog" aria-label="Review and deploy">
+    <h2>Deploy Payroll v3</h2>
+    <ol><li>Dry-run again; stop if the F5 changed since the plan.</li><li>Post the declaration: <b style="color:var(--green)">+${sm.add}</b> <b style="color:var(--amber)">~${sm.change}</b> −${sm.destroy}.</li>
+    <li>Verify the virtual servers and the app's rewriting.</li><li>Create ${sm.dns} DNS records.</li><li>Register the origins as published.</li></ol>
+    <p class="subtle" style="font-size:13px">A deploy in progress cannot be stopped.</p>
+    <h3 style="font-size:14px">Acknowledge each warning</h3>
+    ${PL.warnings.map((w, i) => `<label class="warn"><input type="checkbox" class="ack" data-i="${i}"> <span>${w.service ? `<span class="mono">${esc(w.service)}</span>: ` : ''}${esc(w.text)}</span></label>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn" id="close">Back</button><span style="flex:1"></span><button class="btn danger-solid" id="go" disabled>Deploy to F5</button></div></div>`;
+  document.querySelectorAll('.ack').forEach((c) => c.addEventListener('change', () => { $('#go').disabled = ![...document.querySelectorAll('.ack')].every((x) => x.checked); }));
+  $('#close').addEventListener('click', () => { drawer = false; renderDrawer(); });
+}
+
+function render() { state === 'grouping' ? renderGrouping() : renderPlan(); }
+for (const s of ['grouping', 'plan']) $('#s-' + s).addEventListener('click', () => {
+  state = s; drawer = false; $('#s-grouping').setAttribute('aria-pressed', s === 'grouping'); $('#s-plan').setAttribute('aria-pressed', s === 'plan'); render();
+});
+document.querySelectorAll('[data-theme]').forEach((b) => b.addEventListener('click', () => {
+  document.documentElement.dataset.theme = b.dataset.theme;
+  document.querySelectorAll('[data-theme]').forEach((x) => x.setAttribute('aria-pressed', x === b));
+}));
+render();
+</script>
+</body>
+</html>
