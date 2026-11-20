@@ -86,7 +86,7 @@ import { type ExposureList, useExposureListQuery } from '../data/exposures.queri
                     </span>
                     <div class="min-w-0">
                       <a [routerLink]="['/exposures', e.id]" class="font-medium text-fg after:absolute after:inset-0 hover:text-accent">{{ e.app.name }}</a>
-                      <div class="truncate font-mono text-xs text-fg-subtle">{{ e.app.url ?? 'no URL' }}</div>
+                      <div class="truncate font-mono text-xs text-fg-subtle">{{ e.app.url }}</div>
                     </div>
                   </div>
                 </td>

@@ -45,6 +45,8 @@ Decided, from prototype C: laid out like a pull request's changed files. The lef
 The screen the admin approves from, so it needs the most attention. To decide:
 
 - Syntax highlighting for the declaration and the diff.
+
+Decided while building phase 4: once an exposure has a plan, the left pane gains a Plan section (Summary, each VIP, App VIP · rewrite map, Dry-run diff, Declaration), and a planned exposure opens on its Summary. The summary leads with cards for what changes on the F5, the IPs, the DNS names and the certificates, then the DNS records the deploy will create. While the agent works, a card above the pane lists its steps for the current version as they arrive; a failed phase shows as a banner naming the step and the agent's message, with Retry in the header.
 - How each VIP's IP, DNS names, certificate and services are laid out, with each service's original origin next to the URL that replaces it.
 - How the app's rewrite map is shown, with the `published` services' entries told apart from the new ones.
 - Where the warnings sit relative to the confirm button. In C they appear only in the deploy panel, behind a count on the button; showing them in the plan review itself as well is worth considering.
@@ -60,14 +62,21 @@ Decided, from prototype C:
 
 To decide:
 
-- How the workspace shows that another admin saved the grouping while this one has unsaved changes.
+- Whether the board needs a bulk move (select several cards, move them at once) for exposures with many services.
+
+Decided while building phase 3:
+
+- The grouping is a draft until saved. A bar at the foot of the board says there are unsaved changes, with Discard and Save grouping; Save is disabled, with the reason, while a service is in no group.
+- When another admin saves while this one has unsaved changes, the board keeps them and shows a banner naming who saved and the new version, with Reload, which discards them; Save is disabled meanwhile.
+- In `planning` and `awaiting_confirmation` the board is editable, under a note that saving drops the plan; past that it is read-only.
+- A refused save says why in the bar; a refusal per service marks the cards it names in red.
+- A registry entry's URL is set inline, where the blocker is listed, with the server's error under the field. (The app's URL used to be set the same way; every app has one now, required when the app is created.)
 
 ## Progress and failure
 
-To decide:
+Decided: the event log is its own section of the workspace's left pane, under Activity, with a dot while its stream is live. Its pane is a timeline, newest first: who, what, and when to the second, with a link to any exposure an event names, and a pill saying whether the stream is live, reconnecting or complete.
 
-- How the agent's steps appear as they arrive, while `planning`, `deploying` and `cancelling`.
-- How a failed step, its message and the step log are shown.
+Decided while building phase 5: while `planning`, `deploying` or `cancelling`, a card above the pane lists every step of the phase from the start, each done, under way, failed, skipped (done by an earlier attempt, which a retry resumed after) or still to come, with the agent's message beside it. During a deploy it adds who confirmed it, and that a deploy cannot be stopped. Once a phase failed, a banner names the step and the agent's message, and the same list sits under it, as "Where it stopped".
 
 ## Destructive actions
 
@@ -76,7 +85,16 @@ Confirm deploys to the F5; cancel releases IP reservations, certificates and DNS
 - How these buttons are set apart from the rest.
 - What their dialogs show: for confirm, the plan's summary; for cancel and retry, the lists described under Console in the design doc.
 
-Decided for confirm, from prototype C: a side panel lists what deploying does, step by step, says a deploy cannot be stopped, and has a checkbox for each warning; Deploy is enabled once every one is ticked.
+Decided for confirm, from prototype C: a side panel lists what deploying does, step by step, says a deploy cannot be stopped, and has a checkbox for each warning; Deploy is enabled once every one is ticked. The header's button counts the warnings to acknowledge.
+
+Decided for cancel: a small dialog lists what the agent will release, the IPs and certificates from the plan, before a red Cancel exposure.
+
+Decided while building phase 5:
+
+- Retry after a failed deploy is labelled with the step it resumes from, as "Retry from verify".
+- Cancelling after a failed deploy lists what the agent undoes, in its order: the DNS records it created and the partition's previous declaration, when those steps began, then the certificates and the IPs.
+- A deployed exposure gains a Live section in the left pane, Deployment, and opens on it: where the app is live, who confirmed it and when, the virtual servers, the DNS records and the origins registered. A workspace watching a deploy moves to it when the deploy finishes.
+- The header shows a deployed exposure's public URL beside the app's own.
 
 ## Density, dark mode, accessibility
 

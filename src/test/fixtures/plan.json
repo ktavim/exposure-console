@@ -1,0 +1,1591 @@
+{
+  "app": {
+    "ip": "203.0.113.3",
+    "url": "https://expenses.corp.internal",
+    "name": "Expenses",
+    "existing": false,
+    "public_url": "https://expenses.example.com",
+    "certificate": {
+      "name": "/exp_app_expenses_x034b5994c6/cert_app_expenses_x16a4be6f",
+      "names": [
+        "expenses.example.com"
+      ],
+      "expires": "2027-11-16"
+    }
+  },
+  "diff": [
+    {
+      "op": "@",
+      "text": "@@ -0,0 +1,290 @@"
+    },
+    {
+      "op": "+",
+      "text": "{"
+    },
+    {
+      "op": "+",
+      "text": "  \"app\": {"
+    },
+    {
+      "op": "+",
+      "text": "    \"class\": \"Application\","
+    },
+    {
+      "op": "+",
+      "text": "    \"pool_4fa03fe2790f4dfc\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"Pool\","
+    },
+    {
+      "op": "+",
+      "text": "      \"members\": ["
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"clientTLS\": {"
+    },
+    {
+      "op": "+",
+      "text": "            \"use\": \"tls_to_4fa03fe2790f4dfc\""
+    },
+    {
+      "op": "+",
+      "text": "          },"
+    },
+    {
+      "op": "+",
+      "text": "          \"serverAddresses\": ["
+    },
+    {
+      "op": "+",
+      "text": "            \"10.20.4.11\""
+    },
+    {
+      "op": "+",
+      "text": "          ],"
+    },
+    {
+      "op": "+",
+      "text": "          \"servicePort\": 8443"
+    },
+    {
+      "op": "+",
+      "text": "        }"
+    },
+    {
+      "op": "+",
+      "text": "      ],"
+    },
+    {
+      "op": "+",
+      "text": "      \"monitors\": ["
+    },
+    {
+      "op": "+",
+      "text": "        \"tcp\""
+    },
+    {
+      "op": "+",
+      "text": "      ]"
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"pool_9f899d893e144070\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"Pool\","
+    },
+    {
+      "op": "+",
+      "text": "      \"members\": ["
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"clientTLS\": {"
+    },
+    {
+      "op": "+",
+      "text": "            \"use\": \"tls_to_9f899d893e144070\""
+    },
+    {
+      "op": "+",
+      "text": "          },"
+    },
+    {
+      "op": "+",
+      "text": "          \"serverAddresses\": ["
+    },
+    {
+      "op": "+",
+      "text": "            \"10.20.4.11\""
+    },
+    {
+      "op": "+",
+      "text": "          ],"
+    },
+    {
+      "op": "+",
+      "text": "          \"servicePort\": 443"
+    },
+    {
+      "op": "+",
+      "text": "        }"
+    },
+    {
+      "op": "+",
+      "text": "      ],"
+    },
+    {
+      "op": "+",
+      "text": "      \"monitors\": ["
+    },
+    {
+      "op": "+",
+      "text": "        \"tcp\""
+    },
+    {
+      "op": "+",
+      "text": "      ]"
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"pool_app\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"Pool\","
+    },
+    {
+      "op": "+",
+      "text": "      \"members\": ["
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"addressDiscovery\": \"fqdn\","
+    },
+    {
+      "op": "+",
+      "text": "          \"clientTLS\": {"
+    },
+    {
+      "op": "+",
+      "text": "            \"use\": \"tls_to_app\""
+    },
+    {
+      "op": "+",
+      "text": "          },"
+    },
+    {
+      "op": "+",
+      "text": "          \"hostname\": \"expenses.corp.internal\","
+    },
+    {
+      "op": "+",
+      "text": "          \"servicePort\": 443"
+    },
+    {
+      "op": "+",
+      "text": "        }"
+    },
+    {
+      "op": "+",
+      "text": "      ],"
+    },
+    {
+      "op": "+",
+      "text": "      \"monitors\": ["
+    },
+    {
+      "op": "+",
+      "text": "        \"tcp\""
+    },
+    {
+      "op": "+",
+      "text": "      ]"
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"pool_d4ef73fb610a422c\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"Pool\","
+    },
+    {
+      "op": "+",
+      "text": "      \"members\": ["
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"clientTLS\": {"
+    },
+    {
+      "op": "+",
+      "text": "            \"use\": \"tls_to_d4ef73fb610a422c\""
+    },
+    {
+      "op": "+",
+      "text": "          },"
+    },
+    {
+      "op": "+",
+      "text": "          \"serverAddresses\": ["
+    },
+    {
+      "op": "+",
+      "text": "            \"10.20.4.11\""
+    },
+    {
+      "op": "+",
+      "text": "          ],"
+    },
+    {
+      "op": "+",
+      "text": "          \"servicePort\": 443"
+    },
+    {
+      "op": "+",
+      "text": "        }"
+    },
+    {
+      "op": "+",
+      "text": "      ],"
+    },
+    {
+      "op": "+",
+      "text": "      \"monitors\": ["
+    },
+    {
+      "op": "+",
+      "text": "        \"tcp\""
+    },
+    {
+      "op": "+",
+      "text": "      ]"
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"rewrite_app\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"Rewrite_Profile\","
+    },
+    {
+      "op": "+",
+      "text": "      \"rewriteMode\": \"uri-translation\","
+    },
+    {
+      "op": "+",
+      "text": "      \"uriRules\": ["
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"leftValue\": \"https://api.expenses.corp.internal/\","
+    },
+    {
+      "op": "+",
+      "text": "          \"rightValue\": \"https://api-expenses.example.com/\","
+    },
+    {
+      "op": "+",
+      "text": "          \"type\": \"both\""
+    },
+    {
+      "op": "+",
+      "text": "        },"
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"leftValue\": \"https://api.expenses.corp.internal:8443/\","
+    },
+    {
+      "op": "+",
+      "text": "          \"rightValue\": \"https://api-expenses-8443.example.com/\","
+    },
+    {
+      "op": "+",
+      "text": "          \"type\": \"both\""
+    },
+    {
+      "op": "+",
+      "text": "        },"
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"leftValue\": \"https://reports.corp.internal/\","
+    },
+    {
+      "op": "+",
+      "text": "          \"rightValue\": \"https://reports.example.com/\","
+    },
+    {
+      "op": "+",
+      "text": "          \"type\": \"both\""
+    },
+    {
+      "op": "+",
+      "text": "        },"
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"leftValue\": \"https://expenses.corp.internal/\","
+    },
+    {
+      "op": "+",
+      "text": "          \"rightValue\": \"https://expenses.example.com/\","
+    },
+    {
+      "op": "+",
+      "text": "          \"type\": \"both\""
+    },
+    {
+      "op": "+",
+      "text": "        }"
+    },
+    {
+      "op": "+",
+      "text": "      ]"
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"route_grp_d5febdab3e\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"Endpoint_Policy\","
+    },
+    {
+      "op": "+",
+      "text": "      \"rules\": ["
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"actions\": ["
+    },
+    {
+      "op": "+",
+      "text": "            {"
+    },
+    {
+      "op": "+",
+      "text": "              \"event\": \"request\","
+    },
+    {
+      "op": "+",
+      "text": "              \"replace\": {"
+    },
+    {
+      "op": "+",
+      "text": "                \"name\": \"host\","
+    },
+    {
+      "op": "+",
+      "text": "                \"value\": \"reports.corp.internal\""
+    },
+    {
+      "op": "+",
+      "text": "              },"
+    },
+    {
+      "op": "+",
+      "text": "              \"type\": \"httpHeader\""
+    },
+    {
+      "op": "+",
+      "text": "            },"
+    },
+    {
+      "op": "+",
+      "text": "            {"
+    },
+    {
+      "op": "+",
+      "text": "              \"event\": \"request\","
+    },
+    {
+      "op": "+",
+      "text": "              \"select\": {"
+    },
+    {
+      "op": "+",
+      "text": "                \"pool\": {"
+    },
+    {
+      "op": "+",
+      "text": "                  \"use\": \"pool_9f899d893e144070\""
+    },
+    {
+      "op": "+",
+      "text": "                }"
+    },
+    {
+      "op": "+",
+      "text": "              },"
+    },
+    {
+      "op": "+",
+      "text": "              \"type\": \"forward\""
+    },
+    {
+      "op": "+",
+      "text": "            }"
+    },
+    {
+      "op": "+",
+      "text": "          ],"
+    },
+    {
+      "op": "+",
+      "text": "          \"conditions\": ["
+    },
+    {
+      "op": "+",
+      "text": "            {"
+    },
+    {
+      "op": "+",
+      "text": "              \"all\": {"
+    },
+    {
+      "op": "+",
+      "text": "                \"values\": ["
+    },
+    {
+      "op": "+",
+      "text": "                  \"reports.example.com\""
+    },
+    {
+      "op": "+",
+      "text": "                ]"
+    },
+    {
+      "op": "+",
+      "text": "              },"
+    },
+    {
+      "op": "+",
+      "text": "              \"event\": \"request\","
+    },
+    {
+      "op": "+",
+      "text": "              \"name\": \"host\","
+    },
+    {
+      "op": "+",
+      "text": "              \"type\": \"httpHeader\""
+    },
+    {
+      "op": "+",
+      "text": "            }"
+    },
+    {
+      "op": "+",
+      "text": "          ],"
+    },
+    {
+      "op": "+",
+      "text": "          \"name\": \"to_9f899d893e144070\""
+    },
+    {
+      "op": "+",
+      "text": "        }"
+    },
+    {
+      "op": "+",
+      "text": "      ]"
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"route_grp_e2442507dd\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"Endpoint_Policy\","
+    },
+    {
+      "op": "+",
+      "text": "      \"rules\": ["
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"actions\": ["
+    },
+    {
+      "op": "+",
+      "text": "            {"
+    },
+    {
+      "op": "+",
+      "text": "              \"event\": \"request\","
+    },
+    {
+      "op": "+",
+      "text": "              \"replace\": {"
+    },
+    {
+      "op": "+",
+      "text": "                \"name\": \"host\","
+    },
+    {
+      "op": "+",
+      "text": "                \"value\": \"api.expenses.corp.internal\""
+    },
+    {
+      "op": "+",
+      "text": "              },"
+    },
+    {
+      "op": "+",
+      "text": "              \"type\": \"httpHeader\""
+    },
+    {
+      "op": "+",
+      "text": "            },"
+    },
+    {
+      "op": "+",
+      "text": "            {"
+    },
+    {
+      "op": "+",
+      "text": "              \"event\": \"request\","
+    },
+    {
+      "op": "+",
+      "text": "              \"select\": {"
+    },
+    {
+      "op": "+",
+      "text": "                \"pool\": {"
+    },
+    {
+      "op": "+",
+      "text": "                  \"use\": \"pool_d4ef73fb610a422c\""
+    },
+    {
+      "op": "+",
+      "text": "                }"
+    },
+    {
+      "op": "+",
+      "text": "              },"
+    },
+    {
+      "op": "+",
+      "text": "              \"type\": \"forward\""
+    },
+    {
+      "op": "+",
+      "text": "            }"
+    },
+    {
+      "op": "+",
+      "text": "          ],"
+    },
+    {
+      "op": "+",
+      "text": "          \"conditions\": ["
+    },
+    {
+      "op": "+",
+      "text": "            {"
+    },
+    {
+      "op": "+",
+      "text": "              \"all\": {"
+    },
+    {
+      "op": "+",
+      "text": "                \"values\": ["
+    },
+    {
+      "op": "+",
+      "text": "                  \"api-expenses.example.com\""
+    },
+    {
+      "op": "+",
+      "text": "                ]"
+    },
+    {
+      "op": "+",
+      "text": "              },"
+    },
+    {
+      "op": "+",
+      "text": "              \"event\": \"request\","
+    },
+    {
+      "op": "+",
+      "text": "              \"name\": \"host\","
+    },
+    {
+      "op": "+",
+      "text": "              \"type\": \"httpHeader\""
+    },
+    {
+      "op": "+",
+      "text": "            }"
+    },
+    {
+      "op": "+",
+      "text": "          ],"
+    },
+    {
+      "op": "+",
+      "text": "          \"name\": \"to_d4ef73fb610a422c\""
+    },
+    {
+      "op": "+",
+      "text": "        },"
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"actions\": ["
+    },
+    {
+      "op": "+",
+      "text": "            {"
+    },
+    {
+      "op": "+",
+      "text": "              \"event\": \"request\","
+    },
+    {
+      "op": "+",
+      "text": "              \"replace\": {"
+    },
+    {
+      "op": "+",
+      "text": "                \"name\": \"host\","
+    },
+    {
+      "op": "+",
+      "text": "                \"value\": \"api.expenses.corp.internal:8443\""
+    },
+    {
+      "op": "+",
+      "text": "              },"
+    },
+    {
+      "op": "+",
+      "text": "              \"type\": \"httpHeader\""
+    },
+    {
+      "op": "+",
+      "text": "            },"
+    },
+    {
+      "op": "+",
+      "text": "            {"
+    },
+    {
+      "op": "+",
+      "text": "              \"event\": \"request\","
+    },
+    {
+      "op": "+",
+      "text": "              \"select\": {"
+    },
+    {
+      "op": "+",
+      "text": "                \"pool\": {"
+    },
+    {
+      "op": "+",
+      "text": "                  \"use\": \"pool_4fa03fe2790f4dfc\""
+    },
+    {
+      "op": "+",
+      "text": "                }"
+    },
+    {
+      "op": "+",
+      "text": "              },"
+    },
+    {
+      "op": "+",
+      "text": "              \"type\": \"forward\""
+    },
+    {
+      "op": "+",
+      "text": "            }"
+    },
+    {
+      "op": "+",
+      "text": "          ],"
+    },
+    {
+      "op": "+",
+      "text": "          \"conditions\": ["
+    },
+    {
+      "op": "+",
+      "text": "            {"
+    },
+    {
+      "op": "+",
+      "text": "              \"all\": {"
+    },
+    {
+      "op": "+",
+      "text": "                \"values\": ["
+    },
+    {
+      "op": "+",
+      "text": "                  \"api-expenses-8443.example.com\""
+    },
+    {
+      "op": "+",
+      "text": "                ]"
+    },
+    {
+      "op": "+",
+      "text": "              },"
+    },
+    {
+      "op": "+",
+      "text": "              \"event\": \"request\","
+    },
+    {
+      "op": "+",
+      "text": "              \"name\": \"host\","
+    },
+    {
+      "op": "+",
+      "text": "              \"type\": \"httpHeader\""
+    },
+    {
+      "op": "+",
+      "text": "            }"
+    },
+    {
+      "op": "+",
+      "text": "          ],"
+    },
+    {
+      "op": "+",
+      "text": "          \"name\": \"to_4fa03fe2790f4dfc\""
+    },
+    {
+      "op": "+",
+      "text": "        }"
+    },
+    {
+      "op": "+",
+      "text": "      ]"
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"tls_app\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"certificates\": ["
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"certificate\": {"
+    },
+    {
+      "op": "+",
+      "text": "            \"bigip\": \"/exp_app_expenses_x034b5994c6/cert_app_expenses_x16a4be6f\""
+    },
+    {
+      "op": "+",
+      "text": "          }"
+    },
+    {
+      "op": "+",
+      "text": "        }"
+    },
+    {
+      "op": "+",
+      "text": "      ],"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"TLS_Server\""
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"tls_grp_d5febdab3e\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"certificates\": ["
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"certificate\": {"
+    },
+    {
+      "op": "+",
+      "text": "            \"bigip\": \"/exp_app_expenses_x034b5994c6/cert_grp_d5febdab3e_e60af93e\""
+    },
+    {
+      "op": "+",
+      "text": "          }"
+    },
+    {
+      "op": "+",
+      "text": "        }"
+    },
+    {
+      "op": "+",
+      "text": "      ],"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"TLS_Server\""
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"tls_grp_e2442507dd\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"certificates\": ["
+    },
+    {
+      "op": "+",
+      "text": "        {"
+    },
+    {
+      "op": "+",
+      "text": "          \"certificate\": {"
+    },
+    {
+      "op": "+",
+      "text": "            \"bigip\": \"/exp_app_expenses_x034b5994c6/cert_grp_e2442507dd_16d31558\""
+    },
+    {
+      "op": "+",
+      "text": "          }"
+    },
+    {
+      "op": "+",
+      "text": "        }"
+    },
+    {
+      "op": "+",
+      "text": "      ],"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"TLS_Server\""
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"tls_to_4fa03fe2790f4dfc\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"TLS_Client\","
+    },
+    {
+      "op": "+",
+      "text": "      \"serverName\": \"api.expenses.corp.internal\""
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"tls_to_9f899d893e144070\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"TLS_Client\","
+    },
+    {
+      "op": "+",
+      "text": "      \"serverName\": \"reports.corp.internal\""
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"tls_to_app\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"TLS_Client\","
+    },
+    {
+      "op": "+",
+      "text": "      \"serverName\": \"expenses.corp.internal\""
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"tls_to_d4ef73fb610a422c\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"TLS_Client\","
+    },
+    {
+      "op": "+",
+      "text": "      \"serverName\": \"api.expenses.corp.internal\""
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"vs_app\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"Service_HTTPS\","
+    },
+    {
+      "op": "+",
+      "text": "      \"pool\": \"pool_app\","
+    },
+    {
+      "op": "+",
+      "text": "      \"profileRewrite\": {"
+    },
+    {
+      "op": "+",
+      "text": "        \"use\": \"rewrite_app\""
+    },
+    {
+      "op": "+",
+      "text": "      },"
+    },
+    {
+      "op": "+",
+      "text": "      \"redirect80\": false,"
+    },
+    {
+      "op": "+",
+      "text": "      \"serverTLS\": \"tls_app\","
+    },
+    {
+      "op": "+",
+      "text": "      \"virtualAddresses\": ["
+    },
+    {
+      "op": "+",
+      "text": "        \"203.0.113.3\""
+    },
+    {
+      "op": "+",
+      "text": "      ],"
+    },
+    {
+      "op": "+",
+      "text": "      \"virtualPort\": 443"
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"vs_grp_d5febdab3e\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"Service_HTTPS\","
+    },
+    {
+      "op": "+",
+      "text": "      \"policyEndpoint\": \"route_grp_d5febdab3e\","
+    },
+    {
+      "op": "+",
+      "text": "      \"redirect80\": false,"
+    },
+    {
+      "op": "+",
+      "text": "      \"serverTLS\": \"tls_grp_d5febdab3e\","
+    },
+    {
+      "op": "+",
+      "text": "      \"virtualAddresses\": ["
+    },
+    {
+      "op": "+",
+      "text": "        \"203.0.113.2\""
+    },
+    {
+      "op": "+",
+      "text": "      ],"
+    },
+    {
+      "op": "+",
+      "text": "      \"virtualPort\": 443"
+    },
+    {
+      "op": "+",
+      "text": "    },"
+    },
+    {
+      "op": "+",
+      "text": "    \"vs_grp_e2442507dd\": {"
+    },
+    {
+      "op": "+",
+      "text": "      \"class\": \"Service_HTTPS\","
+    },
+    {
+      "op": "+",
+      "text": "      \"policyEndpoint\": \"route_grp_e2442507dd\","
+    },
+    {
+      "op": "+",
+      "text": "      \"redirect80\": false,"
+    },
+    {
+      "op": "+",
+      "text": "      \"serverTLS\": \"tls_grp_e2442507dd\","
+    },
+    {
+      "op": "+",
+      "text": "      \"virtualAddresses\": ["
+    },
+    {
+      "op": "+",
+      "text": "        \"203.0.113.1\""
+    },
+    {
+      "op": "+",
+      "text": "      ],"
+    },
+    {
+      "op": "+",
+      "text": "      \"virtualPort\": 443"
+    },
+    {
+      "op": "+",
+      "text": "    }"
+    },
+    {
+      "op": "+",
+      "text": "  },"
+    },
+    {
+      "op": "+",
+      "text": "  \"class\": \"Tenant\""
+    },
+    {
+      "op": "+",
+      "text": "}"
+    }
+  ],
+  "vips": [
+    {
+      "ip": "203.0.113.1",
+      "group_id": "grp_e2442507dd",
+      "services": [
+        {
+          "url": "https://api-expenses.example.com",
+          "pool": [
+            "10.20.4.11:443"
+          ],
+          "original": "https://api.expenses.corp.internal",
+          "service_id": "d4ef73fb610a422c90cb07bd35d47f3b",
+          "pool_scheme": "https"
+        },
+        {
+          "url": "https://api-expenses-8443.example.com",
+          "pool": [
+            "10.20.4.11:8443"
+          ],
+          "original": "https://api.expenses.corp.internal:8443",
+          "service_id": "4fa03fe2790f4dfcad9148eac015b6cd",
+          "pool_scheme": "https"
+        }
+      ],
+      "certificate": {
+        "name": "/exp_app_expenses_x034b5994c6/cert_grp_e2442507dd_16d31558",
+        "names": [
+          "api-expenses-8443.example.com",
+          "api-expenses.example.com"
+        ],
+        "expires": "2027-11-16"
+      }
+    },
+    {
+      "ip": "203.0.113.2",
+      "group_id": "grp_d5febdab3e",
+      "services": [
+        {
+          "url": "https://reports.example.com",
+          "pool": [
+            "10.20.4.11:443"
+          ],
+          "original": "https://reports.corp.internal",
+          "service_id": "9f899d893e144070bf10dc87e001c002",
+          "pool_scheme": "https"
+        }
+      ],
+      "certificate": {
+        "name": "/exp_app_expenses_x034b5994c6/cert_grp_d5febdab3e_e60af93e",
+        "names": [
+          "reports.example.com"
+        ],
+        "expires": "2027-11-16"
+      }
+    }
+  ],
+  "rewrite": [
+    {
+      "url": "https://api-expenses.example.com",
+      "source": "new",
+      "original": "https://api.expenses.corp.internal"
+    },
+    {
+      "url": "https://api-expenses-8443.example.com",
+      "source": "new",
+      "original": "https://api.expenses.corp.internal:8443"
+    },
+    {
+      "url": "https://reports.example.com",
+      "source": "new",
+      "original": "https://reports.corp.internal"
+    },
+    {
+      "original": "https://expenses.corp.internal",
+      "url": "https://expenses.example.com",
+      "source": "app"
+    }
+  ],
+  "summary": {
+    "add": 17,
+    "dns": 4,
+    "ips": 3,
+    "change": 0,
+    "destroy": 0,
+    "certificates": 3
+  },
+  "partition": "exp_app_expenses_x034b5994c6",
+  "declaration": {
+    "class": "AS3",
+    "action": "deploy",
+    "persist": true,
+    "declaration": {
+      "id": "exp_401061f7a8",
+      "class": "ADC",
+      "schemaVersion": "3.50.0",
+      "exp_app_expenses_x034b5994c6": {
+        "app": {
+          "class": "Application",
+          "vs_app": {
+            "pool": "pool_app",
+            "class": "Service_HTTPS",
+            "serverTLS": "tls_app",
+            "redirect80": false,
+            "virtualPort": 443,
+            "profileRewrite": {
+              "use": "rewrite_app"
+            },
+            "virtualAddresses": [
+              "203.0.113.3"
+            ]
+          },
+          "tls_app": {
+            "class": "TLS_Server",
+            "certificates": [
+              {
+                "certificate": {
+                  "bigip": "/exp_app_expenses_x034b5994c6/cert_app_expenses_x16a4be6f"
+                }
+              }
+            ]
+          },
+          "pool_app": {
+            "class": "Pool",
+            "members": [
+              {
+                "hostname": "expenses.corp.internal",
+                "clientTLS": {
+                  "use": "tls_to_app"
+                },
+                "servicePort": 443,
+                "addressDiscovery": "fqdn"
+              }
+            ],
+            "monitors": [
+              "tcp"
+            ]
+          },
+          "tls_to_app": {
+            "class": "TLS_Client",
+            "serverName": "expenses.corp.internal"
+          },
+          "rewrite_app": {
+            "class": "Rewrite_Profile",
+            "uriRules": [
+              {
+                "type": "both",
+                "leftValue": "https://api.expenses.corp.internal/",
+                "rightValue": "https://api-expenses.example.com/"
+              },
+              {
+                "type": "both",
+                "leftValue": "https://api.expenses.corp.internal:8443/",
+                "rightValue": "https://api-expenses-8443.example.com/"
+              },
+              {
+                "type": "both",
+                "leftValue": "https://reports.corp.internal/",
+                "rightValue": "https://reports.example.com/"
+              },
+              {
+                "type": "both",
+                "leftValue": "https://expenses.corp.internal/",
+                "rightValue": "https://expenses.example.com/"
+              }
+            ],
+            "rewriteMode": "uri-translation"
+          },
+          "vs_grp_d5febdab3e": {
+            "class": "Service_HTTPS",
+            "serverTLS": "tls_grp_d5febdab3e",
+            "redirect80": false,
+            "virtualPort": 443,
+            "policyEndpoint": "route_grp_d5febdab3e",
+            "virtualAddresses": [
+              "203.0.113.2"
+            ]
+          },
+          "vs_grp_e2442507dd": {
+            "class": "Service_HTTPS",
+            "serverTLS": "tls_grp_e2442507dd",
+            "redirect80": false,
+            "virtualPort": 443,
+            "policyEndpoint": "route_grp_e2442507dd",
+            "virtualAddresses": [
+              "203.0.113.1"
+            ]
+          },
+          "tls_grp_d5febdab3e": {
+            "class": "TLS_Server",
+            "certificates": [
+              {
+                "certificate": {
+                  "bigip": "/exp_app_expenses_x034b5994c6/cert_grp_d5febdab3e_e60af93e"
+                }
+              }
+            ]
+          },
+          "tls_grp_e2442507dd": {
+            "class": "TLS_Server",
+            "certificates": [
+              {
+                "certificate": {
+                  "bigip": "/exp_app_expenses_x034b5994c6/cert_grp_e2442507dd_16d31558"
+                }
+              }
+            ]
+          },
+          "route_grp_d5febdab3e": {
+            "class": "Endpoint_Policy",
+            "rules": [
+              {
+                "name": "to_9f899d893e144070",
+                "actions": [
+                  {
+                    "type": "httpHeader",
+                    "event": "request",
+                    "replace": {
+                      "name": "host",
+                      "value": "reports.corp.internal"
+                    }
+                  },
+                  {
+                    "type": "forward",
+                    "event": "request",
+                    "select": {
+                      "pool": {
+                        "use": "pool_9f899d893e144070"
+                      }
+                    }
+                  }
+                ],
+                "conditions": [
+                  {
+                    "all": {
+                      "values": [
+                        "reports.example.com"
+                      ]
+                    },
+                    "name": "host",
+                    "type": "httpHeader",
+                    "event": "request"
+                  }
+                ]
+              }
+            ]
+          },
+          "route_grp_e2442507dd": {
+            "class": "Endpoint_Policy",
+            "rules": [
+              {
+                "name": "to_d4ef73fb610a422c",
+                "actions": [
+                  {
+                    "type": "httpHeader",
+                    "event": "request",
+                    "replace": {
+                      "name": "host",
+                      "value": "api.expenses.corp.internal"
+                    }
+                  },
+                  {
+                    "type": "forward",
+                    "event": "request",
+                    "select": {
+                      "pool": {
+                        "use": "pool_d4ef73fb610a422c"
+                      }
+                    }
+                  }
+                ],
+                "conditions": [
+                  {
+                    "all": {
+                      "values": [
+                        "api-expenses.example.com"
+                      ]
+                    },
+                    "name": "host",
+                    "type": "httpHeader",
+                    "event": "request"
+                  }
+                ]
+              },
+              {
+                "name": "to_4fa03fe2790f4dfc",
+                "actions": [
+                  {
+                    "type": "httpHeader",
+                    "event": "request",
+                    "replace": {
+                      "name": "host",
+                      "value": "api.expenses.corp.internal:8443"
+                    }
+                  },
+                  {
+                    "type": "forward",
+                    "event": "request",
+                    "select": {
+                      "pool": {
+                        "use": "pool_4fa03fe2790f4dfc"
+                      }
+                    }
+                  }
+                ],
+                "conditions": [
+                  {
+                    "all": {
+                      "values": [
+                        "api-expenses-8443.example.com"
+                      ]
+                    },
+                    "name": "host",
+                    "type": "httpHeader",
+                    "event": "request"
+                  }
+                ]
+              }
+            ]
+          },
+          "pool_4fa03fe2790f4dfc": {
+            "class": "Pool",
+            "members": [
+              {
+                "clientTLS": {
+                  "use": "tls_to_4fa03fe2790f4dfc"
+                },
+                "servicePort": 8443,
+                "serverAddresses": [
+                  "10.20.4.11"
+                ]
+              }
+            ],
+            "monitors": [
+              "tcp"
+            ]
+          },
+          "pool_9f899d893e144070": {
+            "class": "Pool",
+            "members": [
+              {
+                "clientTLS": {
+                  "use": "tls_to_9f899d893e144070"
+                },
+                "servicePort": 443,
+                "serverAddresses": [
+                  "10.20.4.11"
+                ]
+              }
+            ],
+            "monitors": [
+              "tcp"
+            ]
+          },
+          "pool_d4ef73fb610a422c": {
+            "class": "Pool",
+            "members": [
+              {
+                "clientTLS": {
+                  "use": "tls_to_d4ef73fb610a422c"
+                },
+                "servicePort": 443,
+                "serverAddresses": [
+                  "10.20.4.11"
+                ]
+              }
+            ],
+            "monitors": [
+              "tcp"
+            ]
+          },
+          "tls_to_4fa03fe2790f4dfc": {
+            "class": "TLS_Client",
+            "serverName": "api.expenses.corp.internal"
+          },
+          "tls_to_9f899d893e144070": {
+            "class": "TLS_Client",
+            "serverName": "reports.corp.internal"
+          },
+          "tls_to_d4ef73fb610a422c": {
+            "class": "TLS_Client",
+            "serverName": "api.expenses.corp.internal"
+          }
+        },
+        "class": "Tenant"
+      }
+    }
+  },
+  "dns_records": [
+    {
+      "name": "api-expenses-8443.example.com",
+      "type": "A",
+      "target": "203.0.113.1"
+    },
+    {
+      "name": "api-expenses.example.com",
+      "type": "A",
+      "target": "203.0.113.1"
+    },
+    {
+      "name": "expenses.example.com",
+      "type": "A",
+      "target": "203.0.113.3"
+    },
+    {
+      "name": "reports.example.com",
+      "type": "A",
+      "target": "203.0.113.2"
+    }
+  ]
+}
